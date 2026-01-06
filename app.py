@@ -82,53 +82,58 @@ st.markdown("""
     .highlight-metric .metric-sublabel {
         opacity: 0.7;
     }
-    .score-breakdown {
-        background: #f8fafc;
+    .section-card {
+        background: white;
         border-radius: 12px;
         padding: 1.5rem;
         border: 1px solid #e2e8f0;
+        margin-bottom: 1rem;
     }
-    .score-row {
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #0f1c3f;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .benefit-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
         padding: 0.75rem 0;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid #f1f5f9;
     }
-    .score-row:last-child {
+    .benefit-row:last-child {
         border-bottom: none;
     }
-    .score-component {
+    .benefit-label {
         font-size: 0.9rem;
-        color: #1e293b;
+        color: #475569;
     }
-    .score-weight {
-        font-size: 0.8rem;
-        color: #94a3b8;
-    }
-    .score-value {
+    .benefit-value {
         font-weight: 600;
         color: #0f1c3f;
     }
-    .alert-box {
+    .benefit-value.positive {
+        color: #059669;
+    }
+    .benefit-comparison {
+        font-size: 0.8rem;
+        color: #94a3b8;
+    }
+    .impact-stat {
+        text-align: center;
         padding: 1rem;
-        border-radius: 8px;
-        margin-bottom: 1rem;
     }
-    .alert-warning {
-        background: #fffbeb;
-        border: 1px solid #fcd34d;
-        color: #92400e;
+    .impact-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #0f1c3f;
     }
-    .alert-success {
-        background: #ecfdf5;
-        border: 1px solid #6ee7b7;
-        color: #065f46;
-    }
-    .alert-info {
-        background: #eff6ff;
-        border: 1px solid #93c5fd;
-        color: #1e40af;
+    .impact-label {
+        font-size: 0.85rem;
+        color: #64748b;
     }
     .data-due-card {
         background: white;
@@ -148,6 +153,16 @@ st.markdown("""
         padding: 2rem;
         text-align: center;
         margin: 1rem 0;
+    }
+    .alert-box {
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+    .alert-info {
+        background: #eff6ff;
+        border: 1px solid #93c5fd;
+        color: #1e40af;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -183,141 +198,100 @@ def get_partner_submissions(partner_id=None):
         response = supabase.table('partner_submissions').select('*').execute()
     return pd.DataFrame(response.data) if response.data else pd.DataFrame()
 
-def calculate_score_breakdown(partner_id):
-    """Calculate detailed score breakdown for a partner"""
+def calculate_employer_impact_rating(partner_id):
+    """Calculate Impact Rating - methodology hidden from partners"""
     candidates = get_candidates(partner_id)
     submissions = get_partner_submissions(partner_id)
     partner = supabase.table('partners').select('*').eq('id', partner_id).execute().data
     
     if not partner:
-        return None
+        return 0
     
     partner = partner[0]
-    breakdown = {}
     
-    # 1. Living Wage (25%)
-    if partner.get('living_wage_compliant'):
-        breakdown['living_wage'] = {
-            'score': 100,
-            'weight': 25,
-            'weighted': 25,
-            'detail': f"£{partner.get('living_wage_rate', 0)}/hr - Above Real Living Wage"
-        }
-    else:
-        rate = partner.get('living_wage_rate', 0)
-        score = min(100, (rate / 12.60) * 100) if rate else 0
-        breakdown['living_wage'] = {
-            'score': round(score),
-            'weight': 25,
-            'weighted': round(score * 0.25),
-            'detail': f"£{rate}/hr - Below £12.60 threshold"
-        }
+    # Living wage (25%)
+    living_wage_score = 100 if partner.get('living_wage_compliant') else (partner.get('living_wage_rate', 0) / 12.60) * 100
     
-    # 2. Retention (25%)
+    # Retention (25%)
     if len(candidates) > 0:
         active = len(candidates[candidates['status'] == 'Active']) if 'status' in candidates.columns else len(candidates)
-        retention_rate = (active / len(candidates)) * 100
-        # Compare to industry benchmark of 72%
-        retention_score = min(100, (retention_rate / 72) * 100) if retention_rate < 100 else 100
-        breakdown['retention'] = {
-            'score': round(retention_score),
-            'weight': 25,
-            'weighted': round(retention_score * 0.25),
-            'detail': f"{round(retention_rate)}% retained ({active}/{len(candidates)} candidates)"
-        }
+        retention_score = min(100, (active / len(candidates)) * 100)
     else:
-        breakdown['retention'] = {
-            'score': 100,
-            'weight': 25,
-            'weighted': 25,
-            'detail': "No candidates yet"
-        }
+        retention_score = 100
     
-    # 3. Progression Support (20%)
+    # Progression (20%)
+    progression_score = 50
     if len(submissions) > 0:
         avg_training = submissions['training_hours'].mean() if 'training_hours' in submissions.columns else 0
         promotions = submissions['promoted'].sum() if 'promoted' in submissions.columns else 0
-        
-        # Score: up to 50 points for training (20hrs = full), up to 50 for promotions
-        training_score = min(50, (avg_training / 20) * 50)
-        promotion_score = min(50, promotions * 15)
-        progression_score = training_score + promotion_score
-        
-        breakdown['progression'] = {
-            'score': round(progression_score),
-            'weight': 20,
-            'weighted': round(progression_score * 0.20),
-            'detail': f"{round(avg_training)}hrs avg training, {promotions} promotions"
-        }
-    else:
-        breakdown['progression'] = {
-            'score': 50,
-            'weight': 20,
-            'weighted': 10,
-            'detail': "No submissions yet - baseline score"
-        }
+        progression_score = min(100, (avg_training * 2.5) + (promotions * 15))
     
-    # 4. Candidate Outcomes (20%)
+    # Outcomes (20%)
+    outcomes_score = 50
     if len(candidates) > 0 and 'current_wellbeing' in candidates.columns and 'baseline_wellbeing' in candidates.columns:
         avg_improvement = (candidates['current_wellbeing'] - candidates['baseline_wellbeing']).mean()
-        # Score: 0 improvement = 50, +30 improvement = 100
         outcomes_score = min(100, max(0, 50 + (avg_improvement * 1.67)))
-        breakdown['outcomes'] = {
-            'score': round(outcomes_score),
-            'weight': 20,
-            'weighted': round(outcomes_score * 0.20),
-            'detail': f"+{round(avg_improvement)} avg wellbeing improvement"
-        }
-    else:
-        breakdown['outcomes'] = {
-            'score': 50,
-            'weight': 20,
-            'weighted': 10,
-            'detail': "Awaiting candidate check-ins"
-        }
     
-    # 5. Inclusive Practices (10%)
+    # Inclusive practices (10%)
+    inclusive_score = 50
     if len(submissions) > 0:
-        practices_count = 0
-        practices_list = []
-        
+        practices = 0
         if 'flexible_hours' in submissions.columns and submissions['flexible_hours'].any():
-            practices_count += 1
-            practices_list.append("Flexible hours")
+            practices += 25
         if 'language_support' in submissions.columns and submissions['language_support'].any():
-            practices_count += 1
-            practices_list.append("Language support")
+            practices += 25
         if 'mentor_assigned' in submissions.columns and submissions['mentor_assigned'].any():
-            practices_count += 1
-            practices_list.append("Mentoring")
-        if 'other_adjustments' in submissions.columns and submissions['other_adjustments'].notna().any():
-            practices_count += 1
-            practices_list.append("Other adjustments")
-        
-        inclusive_score = min(100, practices_count * 25)
-        breakdown['inclusive'] = {
-            'score': inclusive_score,
-            'weight': 10,
-            'weighted': round(inclusive_score * 0.10),
-            'detail': ", ".join(practices_list) if practices_list else "No practices recorded"
-        }
-    else:
-        breakdown['inclusive'] = {
-            'score': 50,
-            'weight': 10,
-            'weighted': 5,
-            'detail': "No submissions yet - baseline score"
-        }
+            practices += 25
+        inclusive_score = min(100, practices + 25)
     
-    # Calculate total
-    total = sum(item['weighted'] for item in breakdown.values())
-    breakdown['total'] = round(total)
+    total = (living_wage_score * 0.25 + retention_score * 0.25 + progression_score * 0.20 + outcomes_score * 0.20 + inclusive_score * 0.10)
     
-    return breakdown
+    return round(total)
 
-def calculate_employer_impact_rating(partner_id):
-    breakdown = calculate_score_breakdown(partner_id)
-    return breakdown['total'] if breakdown else 0
+def get_partner_metrics(partner_id):
+    """Get business benefit and social impact metrics for a partner"""
+    candidates = get_candidates(partner_id)
+    submissions = get_partner_submissions(partner_id)
+    partner = supabase.table('partners').select('*').eq('id', partner_id).execute().data[0]
+    
+    metrics = {}
+    
+    # Business Benefits
+    total = len(candidates) if len(candidates) > 0 else 0
+    active = len(candidates[candidates['status'] == 'Active']) if 'status' in candidates.columns and len(candidates) > 0 else 0
+    
+    metrics['retention_rate'] = round((active / total) * 100) if total > 0 else 0
+    metrics['sector_avg_retention'] = 72  # Industry benchmark
+    metrics['retention_premium'] = metrics['retention_rate'] - metrics['sector_avg_retention']
+    
+    # Cost savings (£4,500 avg cost to replace an employee)
+    retained_above_avg = max(0, (metrics['retention_rate'] - metrics['sector_avg_retention']) / 100 * total)
+    metrics['cost_savings'] = round(retained_above_avg * 4500)
+    
+    # Training investment
+    metrics['training_hours'] = round(submissions['training_hours'].sum()) if len(submissions) > 0 and 'training_hours' in submissions.columns else 0
+    
+    # Promotions
+    metrics['promotions'] = int(submissions['promoted'].sum()) if len(submissions) > 0 and 'promoted' in submissions.columns else 0
+    
+    # Social Impact
+    metrics['people_employed'] = active
+    metrics['total_placements'] = total
+    
+    if len(candidates) > 0 and 'current_wellbeing' in candidates.columns and 'baseline_wellbeing' in candidates.columns:
+        metrics['avg_wellbeing_change'] = round((candidates['current_wellbeing'] - candidates['baseline_wellbeing']).mean())
+    else:
+        metrics['avg_wellbeing_change'] = 0
+    
+    if len(candidates) > 0 and 'psychological_safety' in candidates.columns:
+        metrics['avg_psych_safety'] = round(candidates['psychological_safety'].mean())
+    else:
+        metrics['avg_psych_safety'] = 0
+    
+    metrics['living_wage_compliant'] = partner.get('living_wage_compliant', False)
+    metrics['living_wage_rate'] = partner.get('living_wage_rate', 0)
+    
+    return metrics
 
 def get_candidates_needing_update(partner_id):
     """Get candidates who need data submission"""
@@ -333,18 +307,15 @@ def get_candidates_needing_update(partner_id):
         if candidate.get('status') != 'Active':
             continue
             
-        # Check last submission
         candidate_submissions = submissions[submissions['candidate_id'] == candidate['id']] if len(submissions) > 0 else pd.DataFrame()
         
         if len(candidate_submissions) == 0:
-            # Never submitted
             needs_update.append({
                 'candidate': candidate,
                 'status': 'overdue',
                 'message': 'No data submitted yet'
             })
         else:
-            # Check if last submission was more than 90 days ago
             last_sub = pd.to_datetime(candidate_submissions['submitted_at']).max()
             days_since = (datetime.now() - last_sub).days
             
@@ -470,7 +441,7 @@ def show_ach_dashboard():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Partner Organisations Ranked")
+        st.subheader("Partner Organisations")
         if len(partners) > 0:
             partner_data = []
             for _, p in partners.iterrows():
@@ -488,30 +459,28 @@ def show_ach_dashboard():
             st.dataframe(df, use_container_width=True, hide_index=True)
     
     with col2:
-        st.subheader("Candidates Overview")
-        if len(candidates) > 0:
-            # Create a chart
-            if 'current_wellbeing' in candidates.columns and 'baseline_wellbeing' in candidates.columns:
-                chart_data = candidates[['candidate_name', 'baseline_wellbeing', 'current_wellbeing']].head(8)
-                chart_data = chart_data.melt(id_vars=['candidate_name'], 
-                                             value_vars=['baseline_wellbeing', 'current_wellbeing'],
-                                             var_name='Type', value_name='Score')
-                chart_data['Type'] = chart_data['Type'].replace({
-                    'baseline_wellbeing': 'Baseline',
-                    'current_wellbeing': 'Current'
-                })
-                
-                fig = px.bar(chart_data, x='candidate_name', y='Score', color='Type',
-                            barmode='group', 
-                            color_discrete_map={'Baseline': '#94a3b8', 'Current': '#059669'})
-                fig.update_layout(
-                    xaxis_title="",
-                    yaxis_title="Wellbeing Score",
-                    legend_title="",
-                    height=300,
-                    margin=dict(l=0, r=0, t=10, b=0)
-                )
-                st.plotly_chart(fig, use_container_width=True)
+        st.subheader("Candidate Wellbeing Progress")
+        if len(candidates) > 0 and 'current_wellbeing' in candidates.columns and 'baseline_wellbeing' in candidates.columns:
+            chart_data = candidates[['candidate_name', 'baseline_wellbeing', 'current_wellbeing']].head(8)
+            chart_data = chart_data.melt(id_vars=['candidate_name'], 
+                                         value_vars=['baseline_wellbeing', 'current_wellbeing'],
+                                         var_name='Type', value_name='Score')
+            chart_data['Type'] = chart_data['Type'].replace({
+                'baseline_wellbeing': 'Baseline',
+                'current_wellbeing': 'Current'
+            })
+            
+            fig = px.bar(chart_data, x='candidate_name', y='Score', color='Type',
+                        barmode='group', 
+                        color_discrete_map={'Baseline': '#94a3b8', 'Current': '#059669'})
+            fig.update_layout(
+                xaxis_title="",
+                yaxis_title="Wellbeing Score",
+                legend_title="",
+                height=300,
+                margin=dict(l=0, r=0, t=10, b=0)
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
 # ACH Data Management
 def show_ach_data_management():
@@ -644,7 +613,7 @@ def show_ach_data_management():
                 else:
                     st.error("Please fill all required fields")
 
-# Partner Dashboard
+# Partner Dashboard - Shows metrics, not calculations
 def show_partner_dashboard():
     partner = st.session_state.user_data
     partner_id = partner['id']
@@ -656,117 +625,174 @@ def show_partner_dashboard():
         
         st.markdown(f"""
         <div class="submission-success">
-            <h2 style="color: #059669; margin-bottom: 0.5rem;">✓ Data Submitted Successfully!</h2>
-            <p style="font-size: 1.1rem; color: #065f46;">Your Impact Rating has been recalculated</p>
+            <h2 style="color: #059669; margin-bottom: 0.5rem;">✓ Data Submitted Successfully</h2>
+            <p style="font-size: 1.1rem; color: #065f46;">Your Impact Rating has been updated</p>
             <div style="font-size: 3rem; font-weight: 700; color: #0f1c3f; margin: 1rem 0;">
-                {st.session_state.previous_score} → {current_score}
-                <span style="font-size: 1.5rem; color: {'#059669' if score_change >= 0 else '#dc2626'};">
-                    ({'+' if score_change >= 0 else ''}{score_change})
+                {current_score}
+                <span style="font-size: 1.2rem; color: {'#059669' if score_change >= 0 else '#dc2626'};">
+                    ({'+' if score_change >= 0 else ''}{score_change} from previous)
                 </span>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Reset the flag
         st.session_state.just_submitted = False
         st.session_state.previous_score = None
     
     st.markdown(f"<h1 class='main-header'>{partner['organisation_name']}</h1>", unsafe_allow_html=True)
     st.markdown("<p class='sub-header'>Your Bridge to Employment Partnership Dashboard</p>", unsafe_allow_html=True)
     
-    candidates = get_candidates(partner_id)
-    breakdown = calculate_score_breakdown(partner_id)
-    impact_rating = breakdown['total'] if breakdown else 0
+    impact_rating = calculate_employer_impact_rating(partner_id)
+    metrics = get_partner_metrics(partner_id)
     
-    # Metrics row
+    # Top metrics row
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.markdown(f"""
         <div class="metric-card highlight-metric">
             <div class="metric-value">{impact_rating}</div>
-            <div class="metric-label">Impact Rating</div>
+            <div class="metric-label">Employer Impact Rating</div>
             <div class="metric-sublabel">Out of 100</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
-        active = len(candidates[candidates['status'] == 'Active']) if 'status' in candidates.columns and len(candidates) > 0 else 0
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-value">{active}</div>
-            <div class="metric-label">Active Placements</div>
-            <div class="metric-sublabel">{len(candidates)} total</div>
+            <div class="metric-value">{metrics['people_employed']}</div>
+            <div class="metric-label">People in Work</div>
+            <div class="metric-sublabel">{metrics['total_placements']} total placed</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
-        if len(candidates) > 0 and 'current_wellbeing' in candidates.columns and 'baseline_wellbeing' in candidates.columns:
-            avg_improvement = round((candidates['current_wellbeing'] - candidates['baseline_wellbeing']).mean())
-        else:
-            avg_improvement = 0
-        css_class = "success-metric" if avg_improvement > 0 else ""
+        css_class = "success-metric" if metrics['avg_wellbeing_change'] > 0 else ""
+        sign = "+" if metrics['avg_wellbeing_change'] >= 0 else ""
         st.markdown(f"""
         <div class="metric-card {css_class}">
-            <div class="metric-value">+{avg_improvement}</div>
-            <div class="metric-label">Avg Wellbeing Gain</div>
-            <div class="metric-sublabel">Points improvement</div>
+            <div class="metric-value">{sign}{metrics['avg_wellbeing_change']}</div>
+            <div class="metric-label">Wellbeing Improvement</div>
+            <div class="metric-sublabel">Average point increase</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
-        wage_status = "✓" if partner.get('living_wage_compliant') else "✗"
-        css_class = "success-metric" if partner.get('living_wage_compliant') else "warning-metric"
+        css_class = "success-metric" if metrics['living_wage_compliant'] else "warning-metric"
+        status = "✓ Compliant" if metrics['living_wage_compliant'] else "Below threshold"
         st.markdown(f"""
         <div class="metric-card {css_class}">
-            <div class="metric-value">£{partner.get('living_wage_rate', 0)}</div>
+            <div class="metric-value">£{metrics['living_wage_rate']}</div>
             <div class="metric-label">Hourly Rate</div>
-            <div class="metric-sublabel">Living Wage: {wage_status}</div>
+            <div class="metric-sublabel">{status}</div>
         </div>
         """, unsafe_allow_html=True)
     
     st.markdown("---")
     
-    # Two columns - Score breakdown and candidates needing update
+    # Two columns: Business Benefits and Social Impact
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("How Your Score is Calculated")
+        st.markdown("""
+        <div class="section-card">
+            <div class="section-title">📊 Business Benefits</div>
+        """, unsafe_allow_html=True)
         
-        if breakdown:
-            components = [
-                ('Living Wage', 'living_wage'),
-                ('Retention', 'retention'),
-                ('Progression Support', 'progression'),
-                ('Candidate Outcomes', 'outcomes'),
-                ('Inclusive Practices', 'inclusive')
-            ]
-            
-            for label, key in components:
-                data = breakdown[key]
-                st.markdown(f"""
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border-radius: 8px; margin-bottom: 0.5rem;">
-                    <div>
-                        <div style="font-weight: 600; color: #1e293b;">{label}</div>
-                        <div style="font-size: 0.8rem; color: #64748b;">{data['detail']}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-weight: 700; color: #0f1c3f;">{data['score']}/100</div>
-                        <div style="font-size: 0.75rem; color: #94a3b8;">×{data['weight']}% = {data['weighted']}</div>
-                    </div>
+        # Retention comparison
+        retention_class = "positive" if metrics['retention_premium'] > 0 else ""
+        retention_sign = "+" if metrics['retention_premium'] > 0 else ""
+        
+        st.markdown(f"""
+            <div class="benefit-row">
+                <div>
+                    <div class="benefit-label">Staff Retention Rate</div>
+                    <div class="benefit-comparison">Sector average: {metrics['sector_avg_retention']}%</div>
                 </div>
-                """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #0f1c3f; border-radius: 8px; margin-top: 1rem;">
-                <div style="font-weight: 600; color: white;">Total Impact Rating</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: white;">{breakdown['total']}</div>
+                <div style="text-align: right;">
+                    <div class="benefit-value">{metrics['retention_rate']}%</div>
+                    <div class="benefit-value {retention_class}">{retention_sign}{metrics['retention_premium']}% vs sector</div>
+                </div>
             </div>
-            """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+        
+        # Cost savings
+        st.markdown(f"""
+            <div class="benefit-row">
+                <div>
+                    <div class="benefit-label">Estimated Turnover Savings</div>
+                    <div class="benefit-comparison">Based on £4,500 avg replacement cost</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="benefit-value positive">£{metrics['cost_savings']:,}</div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Training
+        st.markdown(f"""
+            <div class="benefit-row">
+                <div>
+                    <div class="benefit-label">Training Hours Invested</div>
+                    <div class="benefit-comparison">Across all candidates</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="benefit-value">{metrics['training_hours']} hours</div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Promotions
+        st.markdown(f"""
+            <div class="benefit-row">
+                <div>
+                    <div class="benefit-label">Internal Promotions</div>
+                    <div class="benefit-comparison">Career progression</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="benefit-value">{metrics['promotions']}</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
-        st.subheader("Data Collection Status")
+        st.markdown("""
+        <div class="section-card">
+            <div class="section-title">🌍 Social Impact Generated</div>
+        """, unsafe_allow_html=True)
         
+        st.markdown(f"""
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="impact-stat">
+                    <div class="impact-number">{metrics['people_employed']}</div>
+                    <div class="impact-label">Refugees & Migrants<br>in Meaningful Work</div>
+                </div>
+                <div class="impact-stat">
+                    <div class="impact-number">+{metrics['avg_wellbeing_change']}</div>
+                    <div class="impact-label">Average Wellbeing<br>Score Improvement</div>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="impact-stat">
+                    <div class="impact-number">{metrics['avg_psych_safety']}%</div>
+                    <div class="impact-label">Feel Psychologically<br>Safe at Work</div>
+                </div>
+                <div class="impact-stat">
+                    <div class="impact-number">{'✓' if metrics['living_wage_compliant'] else '✗'}</div>
+                    <div class="impact-label">Real Living Wage<br>Employer</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Data collection status and candidates
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Data Collection Status")
         needs_update = get_candidates_needing_update(partner_id)
         
         if needs_update:
@@ -789,28 +815,25 @@ def show_partner_dashboard():
                 </div>
                 """, unsafe_allow_html=True)
         else:
-            st.success("All candidates are up to date!")
+            st.success("✓ All candidates are up to date")
     
-    st.markdown("---")
-    
-    # Candidates table
-    st.subheader("Your Candidates")
-    if len(candidates) > 0:
-        display_data = []
-        for _, c in candidates.iterrows():
-            improvement = c.get('current_wellbeing', 0) - c.get('baseline_wellbeing', 0)
-            display_data.append({
-                'Name': c['candidate_name'],
-                'Role': c.get('role', ''),
-                'Status': c.get('status', ''),
-                'Baseline': c.get('baseline_wellbeing', 0),
-                'Current': c.get('current_wellbeing', 0),
-                'Change': f"+{improvement}" if improvement >= 0 else str(improvement),
-                'Psych Safety': f"{c.get('psychological_safety', 0)}%"
-            })
-        st.dataframe(pd.DataFrame(display_data), use_container_width=True, hide_index=True)
-    else:
-        st.info("No candidates placed yet")
+    with col2:
+        st.subheader("Your Candidates")
+        candidates = get_candidates(partner_id)
+        if len(candidates) > 0:
+            display_data = []
+            for _, c in candidates.iterrows():
+                improvement = c.get('current_wellbeing', 0) - c.get('baseline_wellbeing', 0)
+                display_data.append({
+                    'Name': c['candidate_name'],
+                    'Role': c.get('role', ''),
+                    'Status': c.get('status', ''),
+                    'Wellbeing': f"+{improvement}" if improvement >= 0 else str(improvement),
+                    'Psych Safety': f"{c.get('psychological_safety', 0)}%"
+                })
+            st.dataframe(pd.DataFrame(display_data), use_container_width=True, hide_index=True)
+        else:
+            st.info("No candidates placed yet")
 
 # Partner Data Submission
 def show_partner_submission():
@@ -818,7 +841,7 @@ def show_partner_submission():
     partner_id = partner['id']
     
     st.markdown("<h1 class='main-header'>Submit Quarterly Update</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='sub-header'>This data helps us track outcomes and calculate your Impact Rating</p>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-header'>Provide updates on your candidates to track outcomes</p>", unsafe_allow_html=True)
     
     candidates = get_candidates(partner_id)
     active_candidates = candidates[candidates['status'] == 'Active'] if 'status' in candidates.columns else candidates
@@ -827,19 +850,10 @@ def show_partner_submission():
         st.warning("No active candidates to update")
         return
     
-    # Show current score
-    current_score = calculate_employer_impact_rating(partner_id)
-    st.markdown(f"""
-    <div class="alert-box alert-info">
-        <strong>Current Impact Rating: {current_score}/100</strong><br>
-        Submit updates to see your score recalculate in real-time
-    </div>
-    """, unsafe_allow_html=True)
-    
     with st.form("partner_submission"):
         # Candidate selection
         candidate_options = dict(zip(active_candidates['candidate_name'], active_candidates['id']))
-        selected_candidate_name = st.selectbox("Select Candidate*", options=list(candidate_options.keys()))
+        selected_candidate_name = st.selectbox("Select Candidate", options=list(candidate_options.keys()))
         candidate_id = candidate_options[selected_candidate_name]
         
         selected_candidate = active_candidates[active_candidates['id'] == candidate_id].iloc[0]
@@ -887,18 +901,18 @@ def show_partner_submission():
         col1, col2 = st.columns(2)
         with col1:
             training_hours = st.number_input("Training hours provided this quarter", min_value=0, value=0)
-            training_type = st.text_input("Type of training (if any)", placeholder="e.g. Health & Safety, Customer Service")
+            training_type = st.text_input("Type of training (if any)", placeholder="e.g. Health & Safety")
         with col2:
             promoted = st.checkbox("Promoted or given new responsibilities?")
             if promoted:
-                promotion_details = st.text_input("Promotion details", placeholder="e.g. Promoted to Team Leader")
+                promotion_details = st.text_input("Promotion details")
             else:
                 promotion_details = None
         
         st.markdown("---")
         
         # Support Provided
-        st.subheader("Support & Adjustments Provided")
+        st.subheader("Support & Adjustments")
         col1, col2, col3 = st.columns(3)
         with col1:
             flexible_hours = st.checkbox("Flexible working hours")
@@ -907,45 +921,37 @@ def show_partner_submission():
         with col3:
             mentor_assigned = st.checkbox("Mentor or buddy assigned")
         
-        other_adjustments = st.text_area(
-            "Other adjustments or support provided",
-            placeholder="Describe any other workplace adjustments or support..."
-        )
+        other_adjustments = st.text_area("Other support provided", placeholder="Describe any other adjustments...")
         
         st.markdown("---")
         
-        # Wellbeing update
-        st.subheader("Candidate Wellbeing (Your Assessment)")
-        st.write("Based on your observations, how would you rate this candidate's current wellbeing and workplace integration?")
-        
+        # Wellbeing assessment
+        st.subheader("Your Assessment")
         col1, col2 = st.columns(2)
         with col1:
             wellbeing_estimate = st.slider(
                 "Overall Wellbeing",
                 0, 100,
                 value=int(selected_candidate.get('current_wellbeing', 50)),
-                help="Your estimate of their overall life stability and wellbeing"
+                help="Your estimate of their overall stability"
             )
         with col2:
             psych_safety_estimate = st.slider(
-                "Psychological Safety at Work",
+                "Psychological Safety",
                 0, 100,
                 value=int(selected_candidate.get('psychological_safety', 50)),
-                help="Do they feel safe to speak up, ask questions, and be themselves?"
+                help="Do they feel safe to speak up and be themselves?"
             )
         
-        concerns = st.text_area(
-            "Any concerns about this candidate?",
-            placeholder="Optional - note any concerns ACH should be aware of..."
-        )
+        concerns = st.text_area("Any concerns?", placeholder="Optional - note any concerns...")
         
         st.markdown("---")
         
         submitted = st.form_submit_button("Submit Update", use_container_width=True, type="primary")
         
         if submitted:
-            # Store previous score for comparison
-            st.session_state.previous_score = current_score
+            # Store previous score
+            st.session_state.previous_score = calculate_employer_impact_rating(partner_id)
             
             # Insert submission
             submission_data = {
@@ -968,7 +974,7 @@ def show_partner_submission():
             
             supabase.table('partner_submissions').insert(submission_data).execute()
             
-            # Update candidate record
+            # Update candidate
             update_data = {
                 "current_wellbeing": wellbeing_estimate,
                 "psychological_safety": psych_safety_estimate,
@@ -980,9 +986,7 @@ def show_partner_submission():
             
             supabase.table('candidates').update(update_data).eq('id', candidate_id).execute()
             
-            # Set flag for success message
             st.session_state.just_submitted = True
-            
             st.rerun()
 
 # Partner submission history
@@ -994,7 +998,6 @@ def show_partner_history():
     submissions = get_partner_submissions(partner['id'])
     
     if len(submissions) > 0:
-        # Join with candidate names
         candidates = get_candidates(partner['id'])
         if len(candidates) > 0:
             candidate_names = dict(zip(candidates['id'], candidates['candidate_name']))
@@ -1004,12 +1007,12 @@ def show_partner_history():
         available_cols = [c for c in display_cols if c in submissions.columns]
         
         display_df = submissions[available_cols].copy()
-        display_df.columns = ['Submitted', 'Candidate', 'Still Employed', 'Hourly Rate', 'Training Hrs', 'Promoted']
+        display_df.columns = ['Submitted', 'Candidate', 'Employed', 'Rate', 'Training', 'Promoted']
         display_df = display_df.sort_values('Submitted', ascending=False)
         
         st.dataframe(display_df, use_container_width=True, hide_index=True)
     else:
-        st.info("No submissions yet. Go to 'Submit Update' to add your first quarterly update.")
+        st.info("No submissions yet")
 
 # Main app
 def main():
@@ -1017,12 +1020,11 @@ def main():
         show_login()
         return
     
-    # Sidebar
     with st.sidebar:
         st.markdown("### 🌍 ACH Impact System")
         
         if st.session_state.user_type == "ach":
-            st.markdown(f"**ACH Staff**")
+            st.markdown("**ACH Staff**")
         else:
             st.markdown(f"**{st.session_state.user_data.get('organisation_name', 'Partner')}**")
             st.markdown(f"_{st.session_state.user_data.get('contact_name', '')}_")
@@ -1044,7 +1046,6 @@ def main():
             st.session_state.previous_score = None
             st.rerun()
     
-    # Main content
     if st.session_state.user_type == "ach":
         if page == "Dashboard":
             show_ach_dashboard()
@@ -1052,7 +1053,7 @@ def main():
             show_ach_data_management()
         elif page == "Reports":
             st.markdown("<h1 class='main-header'>Reports</h1>", unsafe_allow_html=True)
-            st.info("Report generation coming in next update. For now, data can be exported from Data Management.")
+            st.info("Report generation coming soon")
     else:
         if page == "Dashboard":
             show_partner_dashboard()
