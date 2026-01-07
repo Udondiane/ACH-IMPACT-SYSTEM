@@ -120,7 +120,9 @@ if 'user_name' not in st.session_state:
 # ============ DEMO USERS ============
 USERS = {
     "ach_admin": {"password": "impact2024", "type": "ach_staff", "name": "ACH Administrator"},
-    "partner_demo": {"password": "partner123", "type": "partner", "name": "Demo Partner Organisation", "partner_id": 1},
+    "partner_demo": {"password": "partner123", "type": "partner", "name": "Grand Hotel Birmingham", "partner_id": 2},
+    "hospital_demo": {"password": "hospital123", "type": "partner", "name": "Birmingham City Hospital", "partner_id": 1},
+    "care_demo": {"password": "care123", "type": "partner", "name": "Sunrise Care Home", "partner_id": 3},
 }
 
 # ============ LOGIN ============
@@ -158,7 +160,11 @@ def calculate_impact_metrics(partner_id):
         "living_wage_percent": 0,
         "cost_savings": 0,
         "hard_roles_filled": 0,
-        "quotes": []
+        "baseline_retention": 0,
+        "quotes": [],
+        "candidate_quotes": [],
+        "progression_count": 0,
+        "training_count": 0
     }
     
     # Get placements for this partner
@@ -172,22 +178,27 @@ def calculate_impact_metrics(partner_id):
                 metrics["retention_rate"] = round((len(active) / metrics["total_placements"]) * 100)
             
             # Living wage
-            living_wage_count = sum(1 for p in placements.data if p.get("hourly_rate", 0) >= LIVING_WAGE_UK)
+            living_wage_count = sum(1 for p in placements.data if (p.get("hourly_rate") or 0) >= LIVING_WAGE_UK)
             if metrics["total_placements"] > 0:
                 metrics["living_wage_percent"] = round((living_wage_count / metrics["total_placements"]) * 100)
     except:
         pass
     
-    # Get baseline data for hard-to-fill roles
+    # Get baseline data for hard-to-fill roles and baseline retention
     try:
         baseline = supabase.table("partner_baseline").select("*").eq("partner_id", partner_id).execute()
         if baseline.data:
             hard_roles = [b for b in baseline.data if b.get("difficulty") in ["Hard", "Very Hard"]]
             metrics["hard_roles_filled"] = len(hard_roles)
+            
+            # Average baseline retention
+            retention_rates = [b.get("retention_rate", 0) for b in baseline.data if b.get("retention_rate")]
+            if retention_rates:
+                metrics["baseline_retention"] = round(sum(retention_rates) / len(retention_rates))
     except:
         pass
     
-    # Get quotes from interview feedback
+    # Get quotes from interview feedback (standout reasons)
     try:
         feedback = supabase.table("interview_feedback").select("*").eq("partner_id", partner_id).eq("hired", True).execute()
         if feedback.data:
@@ -195,10 +206,42 @@ def calculate_impact_metrics(partner_id):
     except:
         pass
     
+    # Get quotes and progression from milestone reviews
+    try:
+        reviews = supabase.table("milestone_reviews_partner").select("*").eq("partner_id", partner_id).execute()
+        if reviews.data:
+            # Contribution quotes
+            contribution_quotes = [r.get("contribution_quote") for r in reviews.data if r.get("contribution_quote")]
+            metrics["quotes"].extend(contribution_quotes)
+            
+            # Progression count
+            metrics["progression_count"] = sum(1 for r in reviews.data if r.get("progression"))
+            metrics["training_count"] = sum(1 for r in reviews.data if r.get("received_training"))
+            
+            if metrics["total_placements"] > 0:
+                metrics["progression_rate"] = round((metrics["progression_count"] / metrics["total_placements"]) * 100)
+    except:
+        pass
+    
+    # Get candidate quotes
+    try:
+        placement_ids = [p["id"] for p in placements.data] if placements.data else []
+        if placement_ids:
+            for pid in placement_ids:
+                cand_reviews = supabase.table("milestone_reviews_candidate").select("*").eq("placement_id", pid).execute()
+                if cand_reviews.data:
+                    for cr in cand_reviews.data:
+                        if cr.get("improvement_quote"):
+                            metrics["candidate_quotes"].append(cr.get("improvement_quote"))
+    except:
+        pass
+    
     # Calculate cost savings (retention improvement × £4,500 × placements)
-    baseline_retention = 72  # Industry average
-    if metrics["retention_rate"] > baseline_retention:
-        improvement = (metrics["retention_rate"] - baseline_retention) / 100
+    if metrics["baseline_retention"] > 0 and metrics["retention_rate"] > metrics["baseline_retention"]:
+        improvement = (metrics["retention_rate"] - metrics["baseline_retention"]) / 100
+        metrics["cost_savings"] = round(improvement * 4500 * metrics["total_placements"])
+    elif metrics["retention_rate"] > 72:  # Compare to industry average if no baseline
+        improvement = (metrics["retention_rate"] - 72) / 100
         metrics["cost_savings"] = round(improvement * 4500 * metrics["total_placements"])
     
     return metrics
@@ -247,6 +290,7 @@ def ach_dashboard():
         partners = supabase.table("impact_partners").select("*").execute()
         candidates = supabase.table("candidates").select("*").execute()
         placements = supabase.table("placements").select("*").execute()
+        reviews = supabase.table("milestone_reviews_partner").select("*").execute()
         
         total_partners = len(partners.data) if partners.data else 0
         total_candidates = len(candidates.data) if candidates.data else 0
@@ -260,13 +304,57 @@ def ach_dashboard():
         with col3:
             st.metric("Total Placements", total_placements)
         with col4:
+            retention = round((active_placements / total_placements) * 100) if total_placements > 0 else 0
+            st.metric("Overall Retention", f"{retention}%")
+        
+        # Second row
+        st.markdown("---")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
             st.metric("Currently Employed", active_placements)
+        with col2:
+            available = len([c for c in candidates.data if c.get("status") == "Available"]) if candidates.data else 0
+            st.metric("Available Candidates", available)
+        with col3:
+            progressions = len([r for r in reviews.data if r.get("progression")]) if reviews.data else 0
+            st.metric("Career Progressions", progressions)
+        with col4:
+            training = len([r for r in reviews.data if r.get("received_training")]) if reviews.data else 0
+            st.metric("Training Completed", training)
+        
+        # Partner breakdown
+        st.markdown('<p class="section-header">Partner Performance</p>', unsafe_allow_html=True)
+        
+        if partners.data:
+            for partner in partners.data:
+                partner_placements = [p for p in placements.data if p.get("partner_id") == partner["id"]] if placements.data else []
+                active = len([p for p in partner_placements if p.get("status") == "Active"])
+                total = len(partner_placements)
+                retention = round((active / total) * 100) if total > 0 else 0
+                
+                with st.expander(f"**{partner['name']}** — {total} placements, {retention}% retention"):
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.write(f"**Sector:** {partner.get('sector', 'N/A')}")
+                        st.write(f"**Contact:** {partner.get('contact_name', 'N/A')}")
+                    with col2:
+                        st.write(f"**Total Placed:** {total}")
+                        st.write(f"**Currently Active:** {active}")
+                    with col3:
+                        st.write(f"**Retention Rate:** {retention}%")
+                        st.write(f"**Subscription:** {partner.get('subscription_tier', 'N/A')}")
+        
+        # Recent activity
+        st.markdown('<p class="section-header">Recent Placements</p>', unsafe_allow_html=True)
+        
+        if placements.data:
+            recent = sorted(placements.data, key=lambda x: x.get("created_at", ""), reverse=True)[:5]
+            for p in recent:
+                st.write(f"✅ **{p['candidate_name']}** started as {p['role']} at {p['partner_name']} ({p.get('start_date', 'N/A')})")
+        
     except Exception as e:
         st.error(f"Error loading data: {e}")
-    
-    # Recent activity
-    st.markdown('<p class="section-header">Recent Activity</p>', unsafe_allow_html=True)
-    st.info("Activity feed will show recent submissions, reviews, and notifications here.")
 
 def ach_manage_partners():
     st.markdown('<p class="main-header">🏢 Manage Partners</p>', unsafe_allow_html=True)
@@ -505,48 +593,79 @@ def ach_candidate_support():
 # ============ PARTNER PAGES ============
 def partner_dashboard():
     st.markdown('<p class="main-header">📊 Your Impact Dashboard</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sub-header">Track the social impact your organisation creates through employment</p>', unsafe_allow_html=True)
     
     partner_id = st.session_state.get("user_id", 1)
     metrics = calculate_impact_metrics(partner_id)
     
-    # Key metrics
+    # Key metrics row 1
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric("People Employed", metrics["active_employees"], f"of {metrics['total_placements']} placed")
     with col2:
-        st.metric("Retention Rate", f"{metrics['retention_rate']}%", f"+{metrics['retention_rate']-72}% vs industry" if metrics['retention_rate'] > 72 else None)
+        retention_delta = f"+{metrics['retention_rate'] - metrics['baseline_retention']}% vs your baseline" if metrics['baseline_retention'] > 0 else f"+{metrics['retention_rate']-72}% vs industry avg"
+        st.metric("Retention Rate", f"{metrics['retention_rate']}%", retention_delta if metrics['retention_rate'] > 72 else None)
     with col3:
-        st.metric("Living Wage", f"{metrics['living_wage_percent']}%", "of employees")
+        st.metric("Living Wage", f"{metrics['living_wage_percent']}%", "of roles at/above £12/hr")
     with col4:
         st.metric("Est. Cost Savings", f"£{metrics['cost_savings']:,}", "from improved retention")
+    
+    # Key metrics row 2
+    st.markdown("---")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Hard-to-Fill Roles", metrics["hard_roles_filled"], "filled through partnership")
+    with col2:
+        st.metric("Progression Rate", f"{metrics['progression_rate']}%", "received promotion or pay rise")
+    with col3:
+        st.metric("Training Provided", metrics["training_count"], "employees trained")
+    with col4:
+        st.metric("EDI Contribution", f"+{metrics['active_employees']}", "from refugee/migrant backgrounds")
     
     # Pending reviews alert
     pending = get_pending_reviews(partner_id)
     if pending:
         st.markdown('<p class="section-header">⚠️ Action Required</p>', unsafe_allow_html=True)
         for p in pending:
-            status_class = "status-overdue" if p["status"] == "Overdue" else "status-due"
             st.warning(f"**{p['candidate_name']}** — {p['milestone']} due {p['due_date']}")
     
-    # Impact highlights
-    st.markdown('<p class="section-header">Impact Highlights</p>', unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("Hard-to-Fill Roles")
-        st.metric("Filled", metrics["hard_roles_filled"], "roles you struggled to recruit for")
-    
-    with col2:
-        st.subheader("EDI Contribution")
-        st.metric("Workforce Diversity", f"+{metrics['active_employees']}", "employees from refugee/migrant backgrounds")
-    
-    # Quotes
+    # Success stories - Employer quotes
     if metrics["quotes"]:
-        st.markdown('<p class="section-header">What Stood Out</p>', unsafe_allow_html=True)
-        for quote in metrics["quotes"][:3]:
+        st.markdown('<p class="section-header">💬 Success Stories</p>', unsafe_allow_html=True)
+        
+        # Show up to 4 quotes in a grid
+        quote_cols = st.columns(2)
+        for i, quote in enumerate(metrics["quotes"][:4]):
+            with quote_cols[i % 2]:
+                st.markdown(f'<div class="quote-box">"{quote}"</div>', unsafe_allow_html=True)
+    
+    # Candidate voices
+    if metrics["candidate_quotes"]:
+        st.markdown('<p class="section-header">🌟 In Their Own Words</p>', unsafe_allow_html=True)
+        st.caption("What your employees say about working here")
+        
+        for quote in metrics["candidate_quotes"][:3]:
             st.markdown(f'<div class="quote-box">"{quote}"</div>', unsafe_allow_html=True)
+    
+    # Placements list
+    st.markdown('<p class="section-header">👥 Your Team</p>', unsafe_allow_html=True)
+    try:
+        placements = supabase.table("placements").select("*").eq("partner_id", partner_id).execute()
+        if placements.data:
+            for p in placements.data:
+                status_icon = "✅" if p.get("status") == "Active" else "❌"
+                with st.expander(f"{status_icon} **{p['candidate_name']}** — {p['role']}"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**Start Date:** {p.get('start_date', 'N/A')}")
+                        st.write(f"**Contract:** {p.get('contract_type', 'N/A')}")
+                    with col2:
+                        st.write(f"**Hourly Rate:** £{p.get('hourly_rate', 'N/A')}")
+                        st.write(f"**Status:** {p.get('status', 'N/A')}")
+    except:
+        st.info("No placements yet.")
 
 def partner_baseline():
     st.markdown('<p class="main-header">📋 Baseline Data</p>', unsafe_allow_html=True)
@@ -800,45 +919,90 @@ def partner_milestone_review():
 
 def partner_reports():
     st.markdown('<p class="main-header">📑 Impact Reports</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Download your quarterly impact reports</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Your quarterly impact reports</p>', unsafe_allow_html=True)
     
     partner_id = st.session_state.get("user_id", 1)
     metrics = calculate_impact_metrics(partner_id)
-    
-    st.info("Impact reports are generated quarterly based on your submitted data.")
     
     # Check if enough data
     if metrics["total_placements"] == 0:
         st.warning("No placements yet. Reports will be available once you have placed candidates.")
         return
     
-    # Report preview
-    st.markdown('<p class="section-header">Report Preview</p>', unsafe_allow_html=True)
+    # Report header
+    st.markdown("---")
+    st.markdown(f"### 📊 Impact Report: {st.session_state.user_name}")
+    st.markdown(f"**Report Period:** Q4 2024")
+    st.markdown(f"**Generated:** {datetime.now().strftime('%d %B %Y')}")
+    st.markdown("---")
+    
+    # Executive Summary
+    st.markdown("### Executive Summary")
+    st.markdown(f"""
+    Through your partnership with ACH's Bridge to Employment programme, your organisation has:
+    
+    - ✅ Created **{metrics['total_placements']} employment opportunities** for refugees and migrants
+    - ✅ Achieved **{metrics['retention_rate']}% retention** (compared to your baseline of {metrics['baseline_retention']}%)
+    - ✅ Saved an estimated **£{metrics['cost_savings']:,}** in reduced turnover costs
+    - ✅ Provided training to **{metrics['training_count']} employees**
+    - ✅ Supported **{metrics['progression_count']} career progressions** (promotions, pay rises, new responsibilities)
+    """)
+    
+    # Key Metrics
+    st.markdown("---")
+    st.markdown("### Key Metrics")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("📊 Key Metrics")
+        st.markdown("#### Workforce Impact")
         st.write(f"**Total Placements:** {metrics['total_placements']}")
         st.write(f"**Currently Employed:** {metrics['active_employees']}")
         st.write(f"**Retention Rate:** {metrics['retention_rate']}%")
-        st.write(f"**Living Wage Employers:** {metrics['living_wage_percent']}%")
-        st.write(f"**Estimated Cost Savings:** £{metrics['cost_savings']:,}")
+        st.write(f"**Living Wage Roles:** {metrics['living_wage_percent']}%")
     
     with col2:
-        st.subheader("🌟 Impact Highlights")
+        st.markdown("#### Business Value")
         st.write(f"**Hard-to-Fill Roles Filled:** {metrics['hard_roles_filled']}")
-        st.write(f"**EDI Contribution:** +{metrics['active_employees']} employees from refugee/migrant backgrounds")
+        st.write(f"**Est. Cost Savings:** £{metrics['cost_savings']:,}")
+        st.write(f"**Employees Trained:** {metrics['training_count']}")
+        st.write(f"**Career Progressions:** {metrics['progression_count']}")
     
+    # Success Stories
     if metrics["quotes"]:
-        st.subheader("💬 Success Stories")
-        for quote in metrics["quotes"]:
-            st.markdown(f'<div class="quote-box">"{quote}"</div>', unsafe_allow_html=True)
+        st.markdown("---")
+        st.markdown("### Success Stories")
+        st.markdown("*What your team said about our candidates:*")
+        
+        for quote in metrics["quotes"][:3]:
+            st.markdown(f'> "{quote}"')
+            st.markdown("")
     
-    st.divider()
+    # Employee Voices
+    if metrics["candidate_quotes"]:
+        st.markdown("---")
+        st.markdown("### In Their Own Words")
+        st.markdown("*What your employees say about working here:*")
+        
+        for quote in metrics["candidate_quotes"][:3]:
+            st.markdown(f'> "{quote}"')
+            st.markdown("")
     
-    if st.button("📥 Download Full Report (PDF)", use_container_width=True):
-        st.info("PDF generation coming soon. Contact ACH for your quarterly report.")
+    # EDI Statement
+    st.markdown("---")
+    st.markdown("### Diversity & Inclusion Impact")
+    st.markdown(f"""
+    Your organisation has welcomed **{metrics['active_employees']} employees** from refugee and migrant backgrounds, 
+    contributing to a more diverse and inclusive workforce. These individuals bring unique perspectives, 
+    skills, and experiences that enrich your team and strengthen your organisation.
+    """)
+    
+    # Download button
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("📥 Download Full Report (PDF)", use_container_width=True):
+            st.info("PDF download will be available soon. Contact ACH for your formatted quarterly report.")
 
 # ============ NAVIGATION ============
 def main():
