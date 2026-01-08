@@ -111,21 +111,10 @@ def get_benchmark_level(score):
 def render_score_card(label, score, subtitle, show_benchmark=True):
     level, level_class, level_desc = get_benchmark_level(score)
     
-    emerging_active = "benchmark-active" if level_class == "emerging" else ""
-    developing_active = "benchmark-active" if level_class == "developing" else ""
-    established_active = "benchmark-active" if level_class == "established" else ""
-    leading_active = "benchmark-active" if level_class == "leading" else ""
-    
     benchmark_html = ""
     if show_benchmark:
-        benchmark_html = f'''
-        <div style="display: flex; margin-top: 16px; font-size: 0.6rem; gap: 4px;">
-            <div style="flex: 1; padding: 6px 2px; text-align: center; border-radius: 4px; background: rgba(239,68,68,0.3); {"border: 2px solid white; font-weight: 700;" if level_class == "emerging" else ""}">0-40<br/>Emerging</div>
-            <div style="flex: 1; padding: 6px 2px; text-align: center; border-radius: 4px; background: rgba(251,191,36,0.3); {"border: 2px solid white; font-weight: 700;" if level_class == "developing" else ""}">41-60<br/>Developing</div>
-            <div style="flex: 1; padding: 6px 2px; text-align: center; border-radius: 4px; background: rgba(34,197,94,0.3); {"border: 2px solid white; font-weight: 700;" if level_class == "established" else ""}">61-80<br/>Established</div>
-            <div style="flex: 1; padding: 6px 2px; text-align: center; border-radius: 4px; background: rgba(59,130,246,0.3); {"border: 2px solid white; font-weight: 700;" if level_class == "leading" else ""}">81-100<br/>Leading</div>
-        </div>
-        '''
+        benchmark_html = f'<div style="margin-top: 12px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 8px; font-size: 0.75rem;"><strong>{level}</strong>: {level_desc}</div>'
+    
     return f'''
     <div class="score-card">
         <div class="score-label">{label}</div>
@@ -815,28 +804,98 @@ def training_post_survey():
 
 def training_followup():
     st.markdown('<p class="main-header">3-Month Follow-up</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Measuring sustained learning and organisational change</p>', unsafe_allow_html=True)
+    
     partner_id = st.session_state.get("user_id", 101)
     
     with st.form("followup"):
-        attendee_code = st.text_input("Attendee Code *")
+        attendee_code = st.text_input("Attendee Code *", placeholder="Same code used in pre/post surveys")
         
-        st.markdown("### Applied Learning")
-        applied = st.text_area("Describe one specific situation where you applied your learning to support a colleague or candidate from a refugee background. What did you do differently?")
+        st.markdown("---")
+        st.markdown("### Section A: Sustained Confidence")
+        st.caption("Rate your current confidence (same questions as post-training)")
         
-        observed_change = st.select_slider("Since the training, I have observed positive changes in how my organisation supports refugee employees", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
+        q9 = st.select_slider("I feel confident supporting colleagues or service users from refugee backgrounds", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="fu_q9")
+        q10 = st.select_slider("I can adapt my communication style for people with different English proficiency levels", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="fu_q10")
+        q18 = st.select_slider("I feel confident interviewing or assessing candidates from refugee backgrounds fairly", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="fu_q18")
+        q19 = st.select_slider("I know how to support a refugee colleague navigating UK workplace culture", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="fu_q19")
         
-        recommend = st.slider("How likely to recommend this training? (0-10)", 0, 10, 8)
+        st.markdown("---")
+        st.markdown("### Section B: Applied Learning")
         
-        if st.form_submit_button("Submit Follow-up", use_container_width=True):
+        applied_example = st.text_area(
+            "Describe a specific situation where you applied your learning",
+            placeholder="E.g., 'I changed how I conduct interviews by...', 'I supported a colleague by...', 'I advocated for a policy change...'",
+            help="Be specific about what you did differently as a result of the training"
+        )
+        
+        applied_frequency = st.select_slider(
+            "How often have you applied your learning from the training?",
+            options=[1,2,3,4,5],
+            value=3,
+            format_func=lambda x: ["Never", "Once or twice", "A few times", "Regularly", "Very frequently"][x-1]
+        )
+        
+        st.markdown("---")
+        st.markdown("### Section C: Organisational Changes Observed")
+        
+        org_recruitment = st.select_slider("Our recruitment processes have become more inclusive for refugee candidates", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
+        org_onboarding = st.select_slider("Our onboarding has been adapted to better support refugee employees", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
+        org_support = st.select_slider("There is more support available for refugee employees than before", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
+        org_culture = st.select_slider("The overall culture has become more welcoming to people from refugee backgrounds", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
+        
+        specific_changes = st.text_area(
+            "What specific organisational changes have you observed since the training?",
+            placeholder="E.g., 'New translated materials', 'Buddy system introduced', 'Flexible policy for immigration appointments'..."
+        )
+        
+        st.markdown("---")
+        st.markdown("### Section D: Barriers & Recommendations")
+        
+        barriers = st.text_area(
+            "What barriers (if any) have prevented you from applying your learning?",
+            placeholder="E.g., 'Lack of time', 'No opportunities', 'Need more manager support'..."
+        )
+        
+        recommendations = st.text_area(
+            "What additional support would help your organisation become more inclusive?",
+            placeholder="E.g., 'Refresher training', 'Manager-specific session', 'Resources for team meetings'..."
+        )
+        
+        if st.form_submit_button("Submit 3-Month Follow-up", use_container_width=True):
             if attendee_code:
-                behaviour_code = 2 if len(applied) > 100 else (1 if len(applied) > 20 else 0)
-                supabase.table("training_followup").insert({
-                    "partner_id": partner_id, "attendee_code": attendee_code,
-                    "applied_learning_text": applied, "applied_learning_code": behaviour_code,
-                    "observed_change": observed_change, "recommend_score": recommend,
-                    "submitted_at": datetime.now().isoformat()
-                }).execute()
-                st.success("Follow-up submitted")
+                # Calculate scores
+                confidence_avg = (q9 + q10 + q18 + q19) / 4
+                org_change_avg = (org_recruitment + org_onboarding + org_support + org_culture) / 4
+                behaviour_code = 2 if len(applied_example) > 100 else (1 if len(applied_example) > 20 else 0)
+                
+                try:
+                    supabase.table("training_followup").insert({
+                        "partner_id": partner_id,
+                        "attendee_code": attendee_code,
+                        "confidence_q9": q9,
+                        "confidence_q10": q10,
+                        "confidence_q18": q18,
+                        "confidence_q19": q19,
+                        "confidence_avg": confidence_avg,
+                        "applied_learning_text": applied_example,
+                        "applied_learning_code": behaviour_code,
+                        "applied_frequency": applied_frequency,
+                        "org_recruitment": org_recruitment,
+                        "org_onboarding": org_onboarding,
+                        "org_support": org_support,
+                        "org_culture": org_culture,
+                        "org_change_avg": org_change_avg,
+                        "specific_changes": specific_changes,
+                        "barriers": barriers,
+                        "recommendations": recommendations,
+                        "submitted_at": datetime.now().isoformat()
+                    }).execute()
+                    st.success("3-month follow-up submitted successfully")
+                except Exception as e:
+                    st.error(f"Error submitting: {e}")
+            else:
+                st.warning("Please enter your attendee code")
 
 def training_infrastructure():
     st.markdown('<p class="main-header">Infrastructure Assessment</p>', unsafe_allow_html=True)
