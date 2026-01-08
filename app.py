@@ -897,6 +897,75 @@ def training_followup():
             else:
                 st.warning("Please enter your attendee code")
 
+def training_staff_feedback():
+    st.markdown('<p class="main-header">Staff Feedback Collection</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Collect feedback from staff across your organisation</p>', unsafe_allow_html=True)
+    
+    partner_id = st.session_state.get("user_id", 101)
+    
+    st.markdown('<div class="info-card">This form collects feedback from any staff member in your organisation — not just those who attended training. This helps evaluate the broader organisational culture and identify where training is most needed.</div>', unsafe_allow_html=True)
+    
+    with st.form("staff_feedback"):
+        st.markdown("### About You")
+        col1, col2 = st.columns(2)
+        with col1:
+            department = st.text_input("Department *")
+            role_level = st.selectbox("Role Level", ["Frontline Staff", "Team Leader/Supervisor", "Manager", "Senior Manager", "Director/Executive"])
+        with col2:
+            time_in_role = st.selectbox("Time in Organisation", ["< 6 months", "6-12 months", "1-2 years", "2-5 years", "5+ years"])
+            attended_training = st.selectbox("Have you attended ACH inclusion training?", ["Yes", "No", "Not yet - scheduled"])
+        
+        st.markdown("---")
+        st.markdown("### Workplace Inclusion Culture")
+        
+        c1 = st.select_slider("Our organisation genuinely values diversity and inclusion", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="c1")
+        c2 = st.select_slider("I would feel comfortable working alongside colleagues from refugee backgrounds", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="c2")
+        c3 = st.select_slider("My team would be welcoming to a new colleague from a refugee background", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="c3")
+        c4 = st.select_slider("I know where to get support if I needed to help a colleague from a refugee background", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="c4")
+        
+        st.markdown("---")
+        st.markdown("### Awareness & Knowledge")
+        
+        a1 = st.select_slider("I understand the difference between a refugee, asylum seeker, and migrant", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="a1")
+        a2 = st.select_slider("I am aware of challenges refugees may face in the workplace", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="a2")
+        a3 = st.select_slider("I would benefit from training on supporting colleagues from refugee backgrounds", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="a3")
+        
+        st.markdown("---")
+        st.markdown("### Observations")
+        
+        observed_refugees = st.selectbox("Are you aware of any colleagues from refugee backgrounds in your team/department?", ["Yes", "No", "Not sure"])
+        
+        positive_observation = st.text_area("Share a positive example of inclusion you've observed in your workplace (optional)", placeholder="E.g., 'A colleague helped a new team member understand UK workplace customs...'")
+        
+        improvement_suggestion = st.text_area("What could your organisation do better to support refugee employees? (optional)", placeholder="E.g., 'More translated materials', 'Buddy system', 'Manager training'...")
+        
+        if st.form_submit_button("Submit Feedback", use_container_width=True):
+            if department:
+                culture_avg = (c1 + c2 + c3 + c4) / 4
+                awareness_avg = (a1 + a2 + a3) / 3
+                
+                try:
+                    supabase.table("training_staff_feedback").insert({
+                        "partner_id": partner_id,
+                        "department": department,
+                        "role_level": role_level,
+                        "time_in_role": time_in_role,
+                        "attended_training": attended_training,
+                        "culture_1": c1, "culture_2": c2, "culture_3": c3, "culture_4": c4,
+                        "culture_avg": culture_avg,
+                        "awareness_1": a1, "awareness_2": a2, "awareness_3": a3,
+                        "awareness_avg": awareness_avg,
+                        "observed_refugees": observed_refugees,
+                        "positive_observation": positive_observation,
+                        "improvement_suggestion": improvement_suggestion,
+                        "submitted_at": datetime.now().isoformat()
+                    }).execute()
+                    st.success("Thank you for your feedback!")
+                except Exception as e:
+                    st.error(f"Error: {e}")
+            else:
+                st.warning("Please enter your department")
+
 def training_infrastructure():
     st.markdown('<p class="main-header">Infrastructure Assessment</p>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Organisational policies and practices (HR/Leadership)</p>', unsafe_allow_html=True)
@@ -1369,7 +1438,7 @@ def main():
         elif st.session_state.partner_type == "employment":
             page = st.radio("", ["Dashboard", "Baseline Data", "Interview Feedback", "Milestone Reviews"], label_visibility="collapsed")
         elif st.session_state.partner_type == "training":
-            page = st.radio("", ["Dashboard", "Pre-Training Survey", "Post-Training Survey", "3-Month Follow-up", "Infrastructure"], label_visibility="collapsed")
+            page = st.radio("", ["Dashboard", "Pre-Training Survey", "Post-Training Survey", "3-Month Follow-up", "Staff Feedback", "Infrastructure"], label_visibility="collapsed")
         
         st.markdown("---")
         if st.button("Logout", use_container_width=True):
@@ -1382,7 +1451,7 @@ def main():
     elif st.session_state.partner_type == "employment":
         {"Dashboard": employment_dashboard, "Baseline Data": employment_baseline, "Interview Feedback": employment_interviews, "Milestone Reviews": employment_milestones}[page]()
     elif st.session_state.partner_type == "training":
-        {"Dashboard": training_dashboard, "Pre-Training Survey": training_pre_survey, "Post-Training Survey": training_post_survey, "3-Month Follow-up": training_followup, "Infrastructure": training_infrastructure}[page]()
+        {"Dashboard": training_dashboard, "Pre-Training Survey": training_pre_survey, "Post-Training Survey": training_post_survey, "3-Month Follow-up": training_followup, "Staff Feedback": training_staff_feedback, "Infrastructure": training_infrastructure}[page]()
 
 if __name__ == "__main__":
     main()
