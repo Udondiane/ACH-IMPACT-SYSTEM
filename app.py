@@ -110,14 +110,20 @@ def get_benchmark_level(score):
 
 def render_score_card(label, score, subtitle, show_benchmark=True):
     level, level_class, level_desc = get_benchmark_level(score)
+    
+    emerging_active = "benchmark-active" if level_class == "emerging" else ""
+    developing_active = "benchmark-active" if level_class == "developing" else ""
+    established_active = "benchmark-active" if level_class == "established" else ""
+    leading_active = "benchmark-active" if level_class == "leading" else ""
+    
     benchmark_html = ""
     if show_benchmark:
         benchmark_html = f'''
-        <div class="benchmark-bar">
-            <div class="benchmark-segment benchmark-emerging {"benchmark-active" if level_class == "emerging" else ""}">0-40<br>Emerging</div>
-            <div class="benchmark-segment benchmark-developing {"benchmark-active" if level_class == "developing" else ""}">41-60<br>Developing</div>
-            <div class="benchmark-segment benchmark-established {"benchmark-active" if level_class == "established" else ""}">61-80<br>Established</div>
-            <div class="benchmark-segment benchmark-leading {"benchmark-active" if level_class == "leading" else ""}">81-100<br>Leading</div>
+        <div style="display: flex; margin-top: 16px; font-size: 0.6rem; gap: 4px;">
+            <div style="flex: 1; padding: 6px 2px; text-align: center; border-radius: 4px; background: rgba(239,68,68,0.3); {"border: 2px solid white; font-weight: 700;" if level_class == "emerging" else ""}">0-40<br/>Emerging</div>
+            <div style="flex: 1; padding: 6px 2px; text-align: center; border-radius: 4px; background: rgba(251,191,36,0.3); {"border: 2px solid white; font-weight: 700;" if level_class == "developing" else ""}">41-60<br/>Developing</div>
+            <div style="flex: 1; padding: 6px 2px; text-align: center; border-radius: 4px; background: rgba(34,197,94,0.3); {"border: 2px solid white; font-weight: 700;" if level_class == "established" else ""}">61-80<br/>Established</div>
+            <div style="flex: 1; padding: 6px 2px; text-align: center; border-radius: 4px; background: rgba(59,130,246,0.3); {"border: 2px solid white; font-weight: 700;" if level_class == "leading" else ""}">81-100<br/>Leading</div>
         </div>
         '''
     return f'''
@@ -222,7 +228,7 @@ def calculate_candidate_capability_index(partner_id):
 def calculate_employment_metrics(partner_id):
     m = {
         "total": 0, "active": 0, "retention": 0, "baseline_retention": 52,
-        "hard_roles": 0, "productivity_gained": 0,
+        "hard_roles": 0, "productivity_gained": 0, "retention_value": 0,
         "progressions": 0, "progression_support_score": 0,
         "training_provided": 0, "living_wage_employer": True,
         "placements": [], "employer_quotes": [], "candidate_quotes": [],
@@ -256,6 +262,11 @@ def calculate_employment_metrics(partner_id):
             
             rates = [b.get("retention_rate", 52) for b in baseline.data if b.get("retention_rate")]
             m["baseline_retention"] = round(sum(rates) / len(rates)) if rates else 52
+        
+        # Calculate retention value (savings from improved retention)
+        # Average cost to replace an employee is ~£4,500
+        retention_improvement = max(0, m["retention"] - m["baseline_retention"])
+        m["retention_value"] = round((retention_improvement / 100) * 4500 * m["total"])
         
         reviews = supabase.table("milestone_reviews_partner").select("*").eq("partner_id", partner_id).execute()
         if reviews.data:
@@ -355,7 +366,7 @@ def employment_dashboard():
     
     # Business Value Metrics
     st.markdown('<p class="section-header">Business Value</p>', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(f'''
         <div class="metric-card">
@@ -369,7 +380,7 @@ def employment_dashboard():
         <div class="metric-card">
             <div class="metric-label">Productivity Gained</div>
             <div class="metric-value">£{m["productivity_gained"]:,}</div>
-            <div class="metric-detail">from faster vacancy fill (~{m["avg_vacancy_weeks_saved"]} weeks saved per role)</div>
+            <div class="metric-detail">from faster vacancy fill (~{m["avg_vacancy_weeks_saved"]} wks saved)</div>
         </div>
         ''', unsafe_allow_html=True)
     with col3:
@@ -378,7 +389,16 @@ def employment_dashboard():
         <div class="metric-card">
             <div class="metric-label">Retention Rate</div>
             <div class="metric-value">{m["retention"]}%</div>
-            <div class="metric-detail">+{improvement}% vs your baseline ({m["baseline_retention"]}%)</div>
+            <div class="metric-detail">+{improvement}% vs baseline ({m["baseline_retention"]}%)</div>
+        </div>
+        ''', unsafe_allow_html=True)
+    with col4:
+        retention_value = m.get("retention_value", round(improvement * 450 * m["total"] / 10))
+        st.markdown(f'''
+        <div class="metric-card">
+            <div class="metric-label">Retention Savings</div>
+            <div class="metric-value">£{retention_value:,}</div>
+            <div class="metric-detail">from reduced turnover costs</div>
         </div>
         ''', unsafe_allow_html=True)
     
@@ -613,90 +633,75 @@ def training_dashboard():
     sessions_count = 3
     
     sections = {
-        "Knowledge": {"weight": 0.20},
-        "Awareness": {"weight": 0.20},
-        "Confidence": {"weight": 0.25},
-        "Psych Safety": {"weight": 0.15},
-        "Refugee Employment": {"weight": 0.20}
+        "Knowledge": {"weight": 0.15},
+        "Awareness": {"weight": 0.15},
+        "Confidence": {"weight": 0.20},
+        "Psych Safety": {"weight": 0.10},
+        "Refugee Employment": {"weight": 0.15},
+        "Infrastructure": {"weight": 0.25}
     }
     
-    pre_composite = sum(convert_to_100(pre_scores[s]) * sections[s]["weight"] for s in sections)
-    post_composite = sum(convert_to_100(post_scores[s]) * sections[s]["weight"] for s in sections)
+    # Staff capability composite (without infrastructure)
+    staff_sections = ["Knowledge", "Awareness", "Confidence", "Psych Safety", "Refugee Employment"]
+    staff_composite = sum(convert_to_100(post_scores[s]) * sections[s]["weight"] for s in staff_sections)
     
+    # Infrastructure score (from assessment)
     infra_score = 75
     
-    # Two Score Cards with Benchmarks
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(render_score_card(
-            "Inclusion Capability Score",
-            round(post_composite),
-            "Staff knowledge, awareness & confidence"
-        ), unsafe_allow_html=True)
-        st.caption(f"ACH Training Cohort Average: 68")
+    # Combined Inclusion Capability Score (staff capability + infrastructure)
+    inclusion_capability_score = round(staff_composite + (infra_score * sections["Infrastructure"]["weight"]))
     
+    # Single Score Card
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown(render_score_card(
-            "Infrastructure Score",
-            infra_score,
-            "Organisational policies & practices"
+            "Inclusion Capability Score",
+            inclusion_capability_score,
+            "Staff capability + organisational infrastructure"
         ), unsafe_allow_html=True)
-        st.caption(f"ACH Training Cohort Average: 62")
+        st.caption(f"ACH Training Cohort Average: 68")
     
     st.markdown("")
     st.markdown(f'<div class="info-card">Based on <strong>{total_trained} staff trained</strong> across <strong>{sessions_count} sessions</strong></div>', unsafe_allow_html=True)
     
-    # Section breakdown
-    st.markdown('<p class="section-header">Score Breakdown</p>', unsafe_allow_html=True)
+    # Score Components
+    st.markdown('<p class="section-header">Score Components</p>', unsafe_allow_html=True)
     
-    for section, config in sections.items():
-        pre_val = convert_to_100(pre_scores[section])
-        post_val = convert_to_100(post_scores[section])
-        change = post_val - pre_val
-        
-        col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
-        with col1:
-            st.markdown(f"**{section}**")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Staff Capability**")
+        for section in staff_sections:
+            pre_val = convert_to_100(pre_scores[section])
+            post_val = convert_to_100(post_scores[section])
+            change = post_val - pre_val
             st.markdown(f'''
-            <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
-                <div style="height: 100%; width: {post_val}%; background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%); border-radius: 4px;"></div>
+            <div class="domain-score">
+                <div class="domain-label">{section}</div>
+                <div class="domain-bar"><div class="domain-fill" style="width: {post_val}%; background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);"></div></div>
+                <div class="domain-value">{round(post_val)}</div>
             </div>
             ''', unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"Pre: **{round(pre_val)}**")
-        with col3:
-            st.markdown(f"Post: **{round(post_val)}**")
-        with col4:
-            st.markdown(f"<span style='color: #10b981'>+{round(change)} pts</span>", unsafe_allow_html=True)
     
-    # 3-month sustainability
-    st.markdown('<p class="section-header">3-Month Outcomes</p>', unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f'''
-        <div class="metric-card">
-            <div class="metric-label">Learning Retention</div>
-            <div class="metric-value">4/5</div>
-            <div class="metric-detail">Sections sustained at 3 months</div>
-        </div>
-        ''', unsafe_allow_html=True)
     with col2:
+        st.markdown("**Organisational Infrastructure**")
         st.markdown(f'''
         <div class="metric-card">
-            <div class="metric-label">Behaviour Change</div>
-            <div class="metric-value">78%</div>
-            <div class="metric-detail">Applied learning in practice</div>
+            <div class="metric-label">Infrastructure Score</div>
+            <div class="metric-value">{infra_score}</div>
+            <div class="metric-detail">Policies, practices & support systems</div>
         </div>
         ''', unsafe_allow_html=True)
-    with col3:
-        st.markdown(f'''
-        <div class="metric-card">
-            <div class="metric-label">Recommend Score</div>
-            <div class="metric-value">+68</div>
-            <div class="metric-detail">NPS equivalent</div>
-        </div>
-        ''', unsafe_allow_html=True)
+        st.markdown("")
+        st.markdown("Infrastructure measures:")
+        st.markdown("- Recruitment bias review")
+        st.markdown("- Accessible job descriptions")
+        st.markdown("- Alternative qualification recognition")
+        st.markdown("- Adapted onboarding")
+        st.markdown("- Language support available")
+        st.markdown("- Manager training")
+        st.markdown("- Flexible policies")
+        st.markdown("- Clear progression pathways")
 
 # ============ TRAINING FORMS ============
 def training_pre_survey():
