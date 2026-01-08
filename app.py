@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from supabase import create_client
 import json
-from scipy import stats
+import math
 
 SUPABASE_URL = "https://gmjqidqjpzxcpgycawxf.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtanFpZHFqcHp4Y3BneWNhd3hmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MjYyMDEsImV4cCI6MjA4MzMwMjIwMX0.6jtYlz6yoBQCrh04P0g30JigHyanGYnv7xBz24B5Bm4"
@@ -101,12 +101,34 @@ def calculate_cohens_d(pre_scores, post_scores):
     return np.mean(diff) / np.std(diff, ddof=1) if np.std(diff, ddof=1) > 0 else 0
 
 def calculate_p_value(pre_scores, post_scores):
-    """Calculate p-value using paired t-test"""
+    """Calculate approximate p-value using manual paired t-test"""
     if len(pre_scores) < 2 or len(post_scores) < 2:
         return 1.0
     try:
-        _, p_value = stats.ttest_rel(post_scores, pre_scores)
-        return p_value if not np.isnan(p_value) else 1.0
+        n = len(pre_scores)
+        diff = [post_scores[i] - pre_scores[i] for i in range(n)]
+        mean_diff = sum(diff) / n
+        var_diff = sum((d - mean_diff) ** 2 for d in diff) / (n - 1)
+        if var_diff == 0:
+            return 1.0
+        se = math.sqrt(var_diff / n)
+        t_stat = mean_diff / se
+        # Approximate p-value using t-distribution (simplified)
+        df = n - 1
+        # Using approximation for two-tailed p-value
+        t_abs = abs(t_stat)
+        if t_abs > 4:
+            return 0.001
+        elif t_abs > 3:
+            return 0.01
+        elif t_abs > 2.5:
+            return 0.02
+        elif t_abs > 2:
+            return 0.05
+        elif t_abs > 1.5:
+            return 0.15
+        else:
+            return 0.5
     except:
         return 1.0
 
