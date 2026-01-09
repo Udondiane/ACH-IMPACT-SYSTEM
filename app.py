@@ -1,13 +1,12 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
 from supabase import create_client
 import json
-import math
 
 SUPABASE_URL = "https://gmjqidqjpzxcpgycawxf.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtanFpZHFqcHp4Y3BneWNhd3hmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MjYyMDEsImV4cCI6MjA4MzMwMjIwMX0.6jtYlz6yoBQCrh04P0g30JigHyanGYnv7xBz24B5Bm4"
+LIVING_WAGE_UK = 12.00
 
 @st.cache_resource
 def get_supabase():
@@ -15,132 +14,65 @@ def get_supabase():
 
 supabase = get_supabase()
 
-st.set_page_config(page_title="ACH Impact Intelligence", page_icon="◉", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="ACH Impact Intelligence", page_icon="🌍", layout="wide", initial_sidebar_state="expanded")
 
+# ============ STYLING ============
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     * { font-family: 'Inter', sans-serif; }
-    .main-header { font-size: 1.8rem; font-weight: 700; color: #1e293b; margin-bottom: 0.25rem; }
+    .main-header { font-size: 2.2rem; font-weight: 700; color: #1e293b; margin-bottom: 0.25rem; }
     .sub-header { font-size: 1rem; color: #64748b; margin-bottom: 2rem; }
-    
-    .score-card { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%); border-radius: 16px; padding: 24px; color: white; text-align: center; }
-    .score-value { font-size: 3.5rem; font-weight: 800; background: linear-gradient(135deg, #60a5fa 0%, #34d399 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .score-label { font-size: 0.9rem; font-weight: 600; margin-bottom: 8px; opacity: 0.9; }
-    .score-subtitle { font-size: 0.75rem; opacity: 0.7; margin-top: 4px; }
-    
-    .benchmark-bar { display: flex; margin-top: 12px; font-size: 0.65rem; }
-    .benchmark-segment { flex: 1; padding: 4px 2px; text-align: center; border-radius: 4px; margin: 0 2px; }
-    .benchmark-emerging { background: rgba(239,68,68,0.3); }
-    .benchmark-developing { background: rgba(251,191,36,0.3); }
-    .benchmark-established { background: rgba(34,197,94,0.3); }
-    .benchmark-leading { background: rgba(59,130,246,0.3); }
-    .benchmark-active { border: 2px solid white; font-weight: 700; }
-    
-    .metric-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; }
-    .metric-value { font-size: 2rem; font-weight: 700; color: #0f172a; }
-    .metric-label { font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-    .metric-detail { font-size: 0.8rem; color: #10b981; margin-top: 4px; }
-    .metric-detail.neutral { color: #64748b; }
-    
-    .section-header { font-size: 1rem; font-weight: 600; color: #1e293b; margin: 1.5rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 1px solid #e2e8f0; }
-    
-    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
-    .badge-success { background: #dcfce7; color: #166534; }
-    .badge-warning { background: #fef3c7; color: #92400e; }
-    .badge-info { background: #e0f2fe; color: #0369a1; }
-    .badge-danger { background: #fee2e2; color: #991b1b; }
-    
-    .quote-card { background: #f8fafc; border-left: 4px solid #3b82f6; border-radius: 0 8px 8px 0; padding: 16px; margin: 8px 0; }
-    .quote-card.candidate { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-left-color: #10b981; }
-    .quote-text { font-size: 0.9rem; color: #334155; font-style: italic; line-height: 1.5; }
-    .quote-source { font-size: 0.75rem; color: #64748b; margin-top: 8px; }
-    
+    .metric-container { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin-bottom: 16px; }
+    .metric-value { font-size: 2.5rem; font-weight: 700; color: #0f172a; line-height: 1; }
+    .metric-label { font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+    .metric-delta { font-size: 0.85rem; color: #10b981; font-weight: 500; margin-top: 8px; }
+    .section-header { font-size: 1.25rem; font-weight: 600; color: #1e293b; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #e2e8f0; }
+    .quote-card { background: #f8fafc; border-left: 4px solid #3b82f6; border-radius: 0 12px 12px 0; padding: 20px; margin: 12px 0; }
+    .quote-text { font-size: 0.95rem; color: #334155; font-style: italic; line-height: 1.6; margin-bottom: 8px; }
+    .quote-author { font-size: 0.8rem; color: #64748b; font-weight: 500; }
+    .candidate-quote { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-left-color: #10b981; }
+    .highlight-card { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%); border-radius: 16px; padding: 28px; color: white; margin-bottom: 24px; }
+    .highlight-value { font-size: 3rem; font-weight: 700; }
+    .highlight-label { font-size: 0.95rem; opacity: 0.9; }
     .alert-card { background: #fef3c7; border-radius: 8px; padding: 12px 16px; margin: 8px 0; border-left: 4px solid #f59e0b; }
-    .info-card { background: #f0f9ff; border-radius: 8px; padding: 16px; margin: 12px 0; border-left: 4px solid #0284c7; }
-    
-    .partner-row { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center; }
-    .partner-name { font-weight: 600; color: #1e293b; }
-    .partner-meta { font-size: 0.8rem; color: #64748b; }
-    
-    .domain-score { display: flex; align-items: center; margin: 8px 0; }
-    .domain-label { width: 140px; font-size: 0.85rem; color: #475569; }
-    .domain-bar { flex: 1; height: 8px; background: #e2e8f0; border-radius: 4px; margin: 0 12px; overflow: hidden; }
-    .domain-fill { height: 100%; border-radius: 4px; }
-    .domain-value { width: 40px; font-size: 0.85rem; font-weight: 600; color: #1e293b; }
-    
-    .stat-card { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid #e2e8f0; }
-    .stat-value { font-size: 2.5rem; font-weight: 800; color: #0f172a; }
-    .stat-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
-    
+    .success-card { background: #dcfce7; border-radius: 8px; padding: 12px 16px; margin: 8px 0; border-left: 4px solid #10b981; }
+    .info-card { background: #e0f2fe; border-radius: 8px; padding: 16px 20px; margin: 12px 0; border-left: 4px solid #0284c7; border-radius: 0 12px 12px 0; }
+    .form-section { background: #f8fafc; border-radius: 12px; padding: 24px; margin: 16px 0; border: 1px solid #e2e8f0; }
     [data-testid="stSidebar"] { background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); }
-    [data-testid="stSidebar"] * { color: white !important; }
+    [data-testid="stSidebar"] .stMarkdown { color: white; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;}
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+    .stTabs [data-baseweb="tab"] { background-color: #f1f5f9; border-radius: 8px; padding: 8px 16px; }
+    .stTabs [aria-selected="true"] { background-color: #0f172a; color: white; }
 </style>
 """, unsafe_allow_html=True)
 
-# Session state
-for key in ['logged_in', 'user_type', 'user_id', 'user_name', 'partner_type']:
-    if key not in st.session_state:
-        st.session_state[key] = False if key == 'logged_in' else None
+# ============ SESSION STATE ============
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'user_type' not in st.session_state:
+    st.session_state.user_type = None
+if 'user_id' not in st.session_state:
+    st.session_state.user_id = None
+if 'user_name' not in st.session_state:
+    st.session_state.user_name = None
 
 USERS = {
-    "ach_admin": {"password": "impact2024", "type": "ach_staff", "name": "ACH Administrator", "partner_type": None},
-    "doubletree": {"password": "partner123", "type": "partner", "name": "DoubleTree by Hilton", "partner_id": 1, "partner_type": "employment"},
-    "radisson": {"password": "partner123", "type": "partner", "name": "Radisson Blu", "partner_id": 2, "partner_type": "employment"},
-    "starbucks": {"password": "partner123", "type": "partner", "name": "Starbucks", "partner_id": 3, "partner_type": "employment"},
-    "firstbus": {"password": "partner123", "type": "partner", "name": "First Bus", "partner_id": 4, "partner_type": "employment"},
-    "pret": {"password": "partner123", "type": "partner", "name": "Pret A Manger", "partner_id": 5, "partner_type": "employment"},
-    "bristolwaste": {"password": "partner123", "type": "partner", "name": "Bristol Waste", "partner_id": 6, "partner_type": "employment"},
-    "nhs_training": {"password": "training123", "type": "partner", "name": "NHS Bristol Trust", "partner_id": 101, "partner_type": "training"},
-    "council_training": {"password": "training123", "type": "partner", "name": "Bristol City Council", "partner_id": 102, "partner_type": "training"},
-    "university_training": {"password": "training123", "type": "partner", "name": "University of Bristol", "partner_id": 103, "partner_type": "training"},
+    "ach_admin": {"password": "impact2024", "type": "ach_staff", "name": "ACH Administrator"},
+    "partner_demo": {"password": "partner123", "type": "partner", "name": "Grand Hotel Birmingham", "partner_id": 2},
+    "hospital_demo": {"password": "hospital123", "type": "partner", "name": "Birmingham City Hospital NHS Trust", "partner_id": 1},
+    "care_demo": {"password": "care123", "type": "partner", "name": "Sunrise Care Home", "partner_id": 3},
 }
-
-# ============ HELPER FUNCTIONS ============
-def get_benchmark_level(score):
-    if score >= 81:
-        return ("Leading", "leading", "Exemplary practice")
-    elif score >= 61:
-        return ("Established", "established", "Strong foundation")
-    elif score >= 41:
-        return ("Developing", "developing", "Building capability")
-    else:
-        return ("Emerging", "emerging", "Early stage")
-
-def render_score_card(label, score, subtitle, show_benchmark=True):
-    level, level_class, level_desc = get_benchmark_level(score)
-    
-    benchmark_html = ""
-    if show_benchmark:
-        benchmark_html = f'<div style="margin-top: 12px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 8px; font-size: 0.75rem;"><strong>{level}</strong>: {level_desc}</div>'
-    
-    return f'''
-    <div class="score-card">
-        <div class="score-label">{label}</div>
-        <div class="score-value">{score}</div>
-        <div class="score-subtitle">{subtitle}</div>
-        {benchmark_html}
-    </div>
-    '''
-
-def convert_to_100(mean_score):
-    return max(0, min(100, ((mean_score - 1) / 4) * 100))
-
-def calculate_cohens_d(pre_scores, post_scores):
-    if len(pre_scores) < 2 or len(post_scores) < 2:
-        return 0
-    diff = np.array(post_scores) - np.array(pre_scores)
-    return np.mean(diff) / np.std(diff, ddof=1) if np.std(diff, ddof=1) > 0 else 0
 
 # ============ LOGIN ============
 def login_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown('<p class="main-header">ACH Impact Intelligence</p>', unsafe_allow_html=True)
-        st.markdown('<p class="sub-header">Measuring employment outcomes and inclusion capability</p>', unsafe_allow_html=True)
-        
-        with st.form("login"):
+        st.markdown("")
+        st.markdown('<p class="main-header">🌍 ACH Impact Intelligence</p>', unsafe_allow_html=True)
+        st.markdown('<p class="sub-header">Track, measure and report on employment partnership impact</p>', unsafe_allow_html=True)
+        with st.form("login_form"):
             username = st.text_input("Username")
             password = st.text_input("Password", type="password")
             if st.form_submit_button("Sign In", use_container_width=True):
@@ -148,1338 +80,673 @@ def login_page():
                     st.session_state.logged_in = True
                     st.session_state.user_type = USERS[username]["type"]
                     st.session_state.user_name = USERS[username]["name"]
-                    st.session_state.partner_type = USERS[username].get("partner_type")
-                    st.session_state.user_id = USERS[username].get("partner_id")
+                    if "partner_id" in USERS[username]:
+                        st.session_state.user_id = USERS[username]["partner_id"]
                     st.rerun()
                 else:
                     st.error("Invalid credentials")
-        
         st.markdown("---")
-        st.markdown("**Demo Logins**")
-        st.caption("Employment: `doubletree` / `partner123`")
-        st.caption("Training: `nhs_training` / `training123`")
-        st.caption("ACH Staff: `ach_admin` / `impact2024`")
+        st.caption("Demo: `hospital_demo`/`hospital123` or `ach_admin`/`impact2024`")
 
-# ============ CANDIDATE CAPABILITY GROWTH INDEX ============
-def calculate_candidate_capability_index(partner_id):
-    """Calculate Candidate Capability Growth Index from check-in data"""
-    domains = {
-        "self_efficacy": {"score": 0, "label": "Self-Efficacy", "color": "#3b82f6"},
-        "work_readiness": {"score": 0, "label": "Work Readiness", "color": "#8b5cf6"},
-        "social_capital": {"score": 0, "label": "Social Capital", "color": "#06b6d4"},
-        "wellbeing": {"score": 0, "label": "Wellbeing", "color": "#10b981"},
-        "economic_stability": {"score": 0, "label": "Economic Stability", "color": "#f59e0b"},
-    }
-    
-    try:
-        placements = supabase.table("placements").select("id").eq("partner_id", partner_id).execute()
-        if not placements.data:
-            # Return demo data
-            return {
-                "self_efficacy": {"score": 82, "label": "Self-Efficacy", "color": "#3b82f6"},
-                "work_readiness": {"score": 75, "label": "Work Readiness", "color": "#8b5cf6"},
-                "social_capital": {"score": 88, "label": "Social Capital", "color": "#06b6d4"},
-                "wellbeing": {"score": 85, "label": "Wellbeing", "color": "#10b981"},
-                "economic_stability": {"score": 72, "label": "Economic Stability", "color": "#f59e0b"},
-            }, 80
-        
-        placement_ids = [p["id"] for p in placements.data]
-        
-        checkins = supabase.table("candidate_checkins").select("*").in_("placement_id", placement_ids).execute()
-        
-        if checkins.data:
-            for domain in domains:
-                scores = [c.get(f"{domain}_score", 0) for c in checkins.data if c.get(f"{domain}_score")]
-                if scores:
-                    domains[domain]["score"] = round(sum(scores) / len(scores))
-        else:
-            # Demo scores
-            domains["self_efficacy"]["score"] = 82
-            domains["work_readiness"]["score"] = 75
-            domains["social_capital"]["score"] = 88
-            domains["wellbeing"]["score"] = 85
-            domains["economic_stability"]["score"] = 72
-        
-        composite = round(sum(d["score"] for d in domains.values()) / len(domains))
-        return domains, composite
-        
-    except:
-        # Return demo data on error
-        return {
-            "self_efficacy": {"score": 82, "label": "Self-Efficacy", "color": "#3b82f6"},
-            "work_readiness": {"score": 75, "label": "Work Readiness", "color": "#8b5cf6"},
-            "social_capital": {"score": 88, "label": "Social Capital", "color": "#06b6d4"},
-            "wellbeing": {"score": 85, "label": "Wellbeing", "color": "#10b981"},
-            "economic_stability": {"score": 72, "label": "Economic Stability", "color": "#f59e0b"},
-        }, 80
-
-# ============ EMPLOYMENT METRICS ============
-def calculate_employment_metrics(partner_id):
-    m = {
-        "total": 0, "active": 0, "retention": 0, "baseline_retention": 52,
-        "hard_roles": 0, "productivity_gained": 0, "retention_value": 0,
-        "progressions": 0, "progression_support_score": 0,
-        "training_provided": 0, "living_wage_employer": True,
-        "placements": [], "employer_quotes": [], "candidate_quotes": [],
-        "business_score": 0, "social_score": 0,
-        "avg_vacancy_weeks_saved": 6
-    }
-    
+# ============ METRICS CALCULATION ============
+def calculate_metrics(partner_id):
+    m = {"total": 0, "active": 0, "retention": 0, "baseline": 0, "improvement": 0, "progressions": 0, "training": 0, "living_wage": 0, "savings": 0, "hard_roles": 0, "tenure": 0, "employer_quotes": [], "candidate_quotes": [], "placements": []}
     try:
         placements = supabase.table("placements").select("*").eq("partner_id", partner_id).execute()
         if placements.data:
             m["placements"] = placements.data
             m["total"] = len(placements.data)
-            m["active"] = len([p for p in placements.data if p.get("status") == "Active"])
+            active = [p for p in placements.data if p.get("status") == "Active"]
+            m["active"] = len(active)
             m["retention"] = round((m["active"] / m["total"]) * 100) if m["total"] > 0 else 0
+            m["living_wage"] = round((sum(1 for p in placements.data if (p.get("hourly_rate") or 0) >= LIVING_WAGE_UK) / m["total"]) * 100) if m["total"] > 0 else 0
+            tenures = [(datetime.now() - datetime.fromisoformat(p["start_date"])).days / 30 for p in placements.data if p.get("start_date")]
+            m["tenure"] = round(sum(tenures) / len(tenures), 1) if tenures else 0
         
         baseline = supabase.table("partner_baseline").select("*").eq("partner_id", partner_id).execute()
         if baseline.data:
-            hard = [b for b in baseline.data if b.get("difficulty") in ["Hard", "Very Hard"]]
-            m["hard_roles"] = len(hard)
-            
-            # Calculate productivity gained from filling hard-to-fill roles
-            # Based on reduced vacancy time
-            total_productivity = 0
-            for role in hard:
-                salary = role.get("salary", 24000)
-                weekly_value = salary / 52
-                # Assume ACH fills 6 weeks faster than baseline
-                weeks_saved = m["avg_vacancy_weeks_saved"]
-                total_productivity += weekly_value * weeks_saved
-            m["productivity_gained"] = round(total_productivity)
-            
-            rates = [b.get("retention_rate", 52) for b in baseline.data if b.get("retention_rate")]
-            m["baseline_retention"] = round(sum(rates) / len(rates)) if rates else 52
-        
-        # Calculate retention value (savings from improved retention)
-        # Average cost to replace an employee is ~£4,500
-        retention_improvement = max(0, m["retention"] - m["baseline_retention"])
-        m["retention_value"] = round((retention_improvement / 100) * 4500 * m["total"])
-        
-        reviews = supabase.table("milestone_reviews_partner").select("*").eq("partner_id", partner_id).execute()
-        if reviews.data:
-            m["progressions"] = sum(1 for r in reviews.data if r.get("progression"))
-            m["training_provided"] = sum(1 for r in reviews.data if r.get("received_training"))
-            
-            # Progression support score (employer side)
-            total_actions = m["progressions"] + m["training_provided"]
-            m["progression_support_score"] = min(100, round((total_actions / max(1, m["total"])) * 50) + 30)
-            
-            for r in reviews.data:
-                if r.get("contribution_quote"):
-                    m["employer_quotes"].append((r.get("contribution_quote"), "Milestone Review"))
+            m["hard_roles"] = len([b for b in baseline.data if b.get("difficulty") in ["Hard", "Very Hard"]])
+            rates = [b.get("retention_rate", 0) for b in baseline.data if b.get("retention_rate")]
+            m["baseline"] = round(sum(rates) / len(rates)) if rates else 60
+            m["improvement"] = m["retention"] - m["baseline"]
         
         feedback = supabase.table("interview_feedback").select("*").eq("partner_id", partner_id).eq("hired", True).execute()
         if feedback.data:
-            for f in feedback.data:
-                if f.get("standout_reason"):
-                    m["employer_quotes"].append((f.get("standout_reason"), "Interview Feedback"))
+            m["employer_quotes"] = [(f.get("standout_reason"), f.get("candidate_name")) for f in feedback.data if f.get("standout_reason")]
         
-        # Candidate quotes from check-ins
+        reviews = supabase.table("milestone_reviews_partner").select("*").eq("partner_id", partner_id).execute()
+        if reviews.data:
+            m["employer_quotes"].extend([(r.get("contribution_quote"), None) for r in reviews.data if r.get("contribution_quote")])
+            m["progressions"] = sum(1 for r in reviews.data if r.get("progression"))
+            m["training"] = sum(1 for r in reviews.data if r.get("received_training"))
+        
         if placements.data:
             for p in placements.data:
                 cr = supabase.table("milestone_reviews_candidate").select("*").eq("placement_id", p["id"]).execute()
                 if cr.data:
-                    for c in cr.data:
-                        if c.get("improvement_quote"):
-                            m["candidate_quotes"].append((c.get("improvement_quote"), p.get("candidate_name"), "Check-in"))
+                    m["candidate_quotes"].extend([(c.get("improvement_quote"), p.get("candidate_name")) for c in cr.data if c.get("improvement_quote")])
         
-        # Get Candidate Capability Growth Index
-        domains, capability_index = calculate_candidate_capability_index(partner_id)
-        
-        # Business Value Score
-        # Based on productivity gained and retention improvement
-        retention_improvement = max(0, m["retention"] - m["baseline_retention"])
-        productivity_score = min(100, (m["productivity_gained"] / 20000) * 100) if m["productivity_gained"] > 0 else 50
-        retention_score = min(100, 50 + retention_improvement)
-        m["business_score"] = round(productivity_score * 0.5 + retention_score * 0.5)
-        
-        # Social Impact Score
-        # Candidate Capability Index (40%) + Progression Support (30%) + Living Wage (15%) + Talents Count (15%)
-        living_wage_score = 100 if m["living_wage_employer"] else 0
-        talents_score = min(100, m["active"] * 10)  # 10 points per active talent, max 100
-        m["social_score"] = round(
-            capability_index * 0.40 +
-            m["progression_support_score"] * 0.30 +
-            living_wage_score * 0.15 +
-            talents_score * 0.15
-        )
-        
-        m["capability_domains"] = domains
-        m["capability_index"] = capability_index
-        
+        if m["improvement"] > 0:
+            m["savings"] = round((m["improvement"] / 100) * 4500 * m["total"])
     except Exception as e:
-        # Demo data on error
-        m["business_score"] = 74
-        m["social_score"] = 78
-        m["capability_index"] = 80
-        m["productivity_gained"] = 12500
-        m["capability_domains"] = {
-            "self_efficacy": {"score": 82, "label": "Self-Efficacy", "color": "#3b82f6"},
-            "work_readiness": {"score": 75, "label": "Work Readiness", "color": "#8b5cf6"},
-            "social_capital": {"score": 88, "label": "Social Capital", "color": "#06b6d4"},
-            "wellbeing": {"score": 85, "label": "Wellbeing", "color": "#10b981"},
-            "economic_stability": {"score": 72, "label": "Economic Stability", "color": "#f59e0b"},
-        }
-    
+        pass
     return m
 
-# ============ EMPLOYMENT DASHBOARD ============
-def employment_dashboard():
-    st.markdown(f'<p class="main-header">{st.session_state.user_name}</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Employment Partnership Dashboard</p>', unsafe_allow_html=True)
+def get_pending_reviews(partner_id):
+    pending = []
+    try:
+        placements = supabase.table("placements").select("*").eq("partner_id", partner_id).eq("status", "Active").execute()
+        if placements.data:
+            for p in placements.data:
+                if p.get("start_date"):
+                    months = (datetime.now() - datetime.fromisoformat(p["start_date"])).days / 30
+                    for m in [3, 6, 12]:
+                        if months >= m:
+                            rev = supabase.table("milestone_reviews_partner").select("id").eq("placement_id", p["id"]).eq("milestone_month", m).execute()
+                            if not rev.data:
+                                pending.append({"name": p.get("candidate_name"), "role": p.get("role"), "milestone": m, "placement_id": p["id"], "start_date": p.get("start_date")})
+    except:
+        pass
+    return pending
+
+def get_candidates_awaiting_feedback(partner_id):
+    """Get candidates who have been interviewed but no feedback submitted"""
+    awaiting = []
+    try:
+        # Get all placements for this partner
+        placements = supabase.table("placements").select("*").eq("partner_id", partner_id).execute()
+        if placements.data:
+            for p in placements.data:
+                # Check if feedback exists
+                feedback = supabase.table("interview_feedback").select("id").eq("partner_id", partner_id).eq("candidate_id", p.get("candidate_id")).execute()
+                if not feedback.data:
+                    awaiting.append(p)
+    except:
+        pass
+    return awaiting
+
+# ============ PARTNER DASHBOARD ============
+def partner_dashboard():
+    st.markdown('<p class="main-header">📊 Impact Dashboard</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sub-header">{st.session_state.user_name}</p>', unsafe_allow_html=True)
     
     partner_id = st.session_state.get("user_id", 1)
-    m = calculate_employment_metrics(partner_id)
+    m = calculate_metrics(partner_id)
     
-    # Two Score Cards with Benchmarks
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(render_score_card(
-            "Business Value Score",
-            m["business_score"],
-            "Productivity & retention gains"
-        ), unsafe_allow_html=True)
-        st.caption(f"ACH Partner Average: 68")
-    
-    with col2:
-        st.markdown(render_score_card(
-            "Social Impact Score", 
-            m["social_score"],
-            "Candidate outcomes & progression"
-        ), unsafe_allow_html=True)
-        st.caption(f"ACH Partner Average: 72")
-    
-    st.markdown("")
-    
-    # Business Value Metrics
-    st.markdown('<p class="section-header">Business Value</p>', unsafe_allow_html=True)
+    # Metrics row 1
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.markdown(f'''
-        <div class="metric-card">
-            <div class="metric-label">Hard-to-Fill Roles Filled</div>
-            <div class="metric-value">{m["hard_roles"]}</div>
-            <div class="metric-detail">roles secured through ACH</div>
-        </div>
-        ''', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-container"><div class="metric-label">People Employed</div><div class="metric-value">{m["active"]}</div><div class="metric-delta">of {m["total"]} placed</div></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown(f'''
-        <div class="metric-card">
-            <div class="metric-label">Productivity Gained</div>
-            <div class="metric-value">£{m["productivity_gained"]:,}</div>
-            <div class="metric-detail">from faster vacancy fill (~{m["avg_vacancy_weeks_saved"]} wks saved)</div>
-        </div>
-        ''', unsafe_allow_html=True)
+        delta_text = f'+{m["improvement"]}%' if m["improvement"] >= 0 else f'{m["improvement"]}%'
+        st.markdown(f'<div class="metric-container"><div class="metric-label">Retention Rate</div><div class="metric-value">{m["retention"]}%</div><div class="metric-delta">{delta_text} vs baseline</div></div>', unsafe_allow_html=True)
     with col3:
-        improvement = m["retention"] - m["baseline_retention"]
-        st.markdown(f'''
-        <div class="metric-card">
-            <div class="metric-label">Retention Rate</div>
-            <div class="metric-value">{m["retention"]}%</div>
-            <div class="metric-detail">+{improvement}% vs baseline ({m["baseline_retention"]}%)</div>
-        </div>
-        ''', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-container"><div class="metric-label">Cost Savings</div><div class="metric-value">£{m["savings"]:,}</div><div class="metric-delta">from retention</div></div>', unsafe_allow_html=True)
     with col4:
-        retention_value = m.get("retention_value", round(improvement * 450 * m["total"] / 10))
-        st.markdown(f'''
-        <div class="metric-card">
-            <div class="metric-label">Retention Savings</div>
-            <div class="metric-value">£{retention_value:,}</div>
-            <div class="metric-detail">from reduced turnover costs</div>
-        </div>
-        ''', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-container"><div class="metric-label">Progressions</div><div class="metric-value">{m["progressions"]}</div><div class="metric-delta">promotions & pay rises</div></div>', unsafe_allow_html=True)
     
-    # Social Impact Metrics
-    st.markdown('<p class="section-header">Social Impact</p>', unsafe_allow_html=True)
-    
-    col1, col2 = st.columns([1, 1])
+    # Metrics row 2
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        # Candidate Capability Growth Index
-        st.markdown("**Candidate Capability Growth Index**")
-        domains = m.get("capability_domains", {})
-        for key, domain in domains.items():
-            st.markdown(f'''
-            <div class="domain-score">
-                <div class="domain-label">{domain["label"]}</div>
-                <div class="domain-bar"><div class="domain-fill" style="width: {domain["score"]}%; background: {domain["color"]};"></div></div>
-                <div class="domain-value">{domain["score"]}</div>
-            </div>
-            ''', unsafe_allow_html=True)
-        st.markdown(f"**Composite Index: {m.get('capability_index', 80)}**/100")
-    
+        st.markdown(f'<div class="metric-container"><div class="metric-label">Living Wage</div><div class="metric-value">{m["living_wage"]}%</div><div class="metric-delta">above £12/hr</div></div>', unsafe_allow_html=True)
     with col2:
-        # Other social metrics
-        st.markdown(f'''
-        <div class="metric-card" style="margin-bottom: 12px;">
-            <div class="metric-label">Talents from Refugee/Migrant Backgrounds</div>
-            <div class="metric-value">{m["active"]}</div>
-            <div class="metric-detail">{m["total"]} total placements</div>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        st.markdown(f'''
-        <div class="metric-card" style="margin-bottom: 12px;">
-            <div class="metric-label">Progression Support Score</div>
-            <div class="metric-value">{m["progression_support_score"]}</div>
-            <div class="metric-detail">{m["training_provided"]} training actions, {m["progressions"]} progressions</div>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        badge_class = "badge-success" if m["living_wage_employer"] else "badge-warning"
-        badge_text = "Living Wage Employer" if m["living_wage_employer"] else "Not Living Wage Accredited"
-        st.markdown(f'''
-        <div class="metric-card">
-            <div class="metric-label">Living Wage Status</div>
-            <div style="margin-top: 8px;"><span class="badge {badge_class}">{badge_text}</span></div>
-        </div>
-        ''', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-container"><div class="metric-label">Hard-to-Fill</div><div class="metric-value">{m["hard_roles"]}</div><div class="metric-delta">roles filled</div></div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown(f'<div class="metric-container"><div class="metric-label">Training</div><div class="metric-value">{m["training"]}</div><div class="metric-delta">completions</div></div>', unsafe_allow_html=True)
+    with col4:
+        st.markdown(f'<div class="metric-container"><div class="metric-label">Avg Tenure</div><div class="metric-value">{m["tenure"]}</div><div class="metric-delta">months</div></div>', unsafe_allow_html=True)
     
-    # Candidate Voices
+    # Pending actions
+    pending = get_pending_reviews(partner_id)
+    if pending:
+        st.markdown('<p class="section-header">⚠️ Action Required</p>', unsafe_allow_html=True)
+        st.markdown('<div class="info-card">Complete these reviews to maintain your impact reporting. Without timely data, your quarterly report cannot be generated.</div>', unsafe_allow_html=True)
+        for p in pending[:3]:
+            st.markdown(f'<div class="alert-card"><strong>{p["name"]}</strong> ({p["role"]}) — {p["milestone"]}-month review due</div>', unsafe_allow_html=True)
+        if len(pending) > 3:
+            st.caption(f"+ {len(pending) - 3} more reviews pending")
+    
+    # Success stories
+    if m["employer_quotes"]:
+        st.markdown('<p class="section-header">💬 Success Stories</p>', unsafe_allow_html=True)
+        cols = st.columns(2)
+        for i, (q, n) in enumerate(m["employer_quotes"][:4]):
+            with cols[i % 2]:
+                author = f'<div class="quote-author">— About {n}</div>' if n else ''
+                st.markdown(f'<div class="quote-card"><div class="quote-text">"{q}"</div>{author}</div>', unsafe_allow_html=True)
+    
+    # Candidate voices
     if m["candidate_quotes"]:
-        st.markdown('<p class="section-header">Candidate Voices</p>', unsafe_allow_html=True)
-        for quote, name, source in m["candidate_quotes"][:3]:
-            st.markdown(f'''
-            <div class="quote-card candidate">
-                <div class="quote-text">"{quote}"</div>
-                <div class="quote-source">— {name} (from {source})</div>
-            </div>
-            ''', unsafe_allow_html=True)
+        st.markdown('<p class="section-header">🌟 In Their Own Words</p>', unsafe_allow_html=True)
+        cols = st.columns(2)
+        for i, (q, n) in enumerate(m["candidate_quotes"][:4]):
+            with cols[i % 2]:
+                author = f'<div class="quote-author">— {n}</div>' if n else ''
+                st.markdown(f'<div class="quote-card candidate-quote"><div class="quote-text">"{q}"</div>{author}</div>', unsafe_allow_html=True)
     
-    # Team
-    st.markdown('<p class="section-header">Your Team</p>', unsafe_allow_html=True)
+    # Team list
+    st.markdown('<p class="section-header">👥 Your Team</p>', unsafe_allow_html=True)
     if m["placements"]:
         for p in m["placements"]:
-            status_badge = "badge-success" if p.get("status") == "Active" else "badge-info"
-            st.markdown(f"**{p['candidate_name']}** — {p['role']} · <span class='badge {status_badge}'>{p.get('status', 'Active')}</span>", unsafe_allow_html=True)
+            status = "✅" if p.get("status") == "Active" else "⚪"
+            st.markdown(f"{status} **{p['candidate_name']}** — {p['role']} (Started {p.get('start_date', 'N/A')})")
     else:
-        st.info("No placements yet.")
+        st.info("No placements yet. Once candidates are hired, they will appear here.")
 
-# ============ EMPLOYMENT FORMS ============
-def employment_baseline():
-    st.markdown('<p class="main-header">Baseline Data</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Role information for measuring impact</p>', unsafe_allow_html=True)
+# ============ PARTNER BASELINE DATA ============
+def partner_baseline():
+    st.markdown('<p class="main-header">📋 Baseline Data</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Role information helps us measure your recruitment improvements</p>', unsafe_allow_html=True)
     
     partner_id = st.session_state.get("user_id", 1)
     
+    # Show existing roles
     try:
         existing = supabase.table("partner_baseline").select("*").eq("partner_id", partner_id).execute()
         if existing.data:
             st.markdown(f"**{len(existing.data)} roles configured**")
             for r in existing.data:
-                diff_badge = "badge-danger" if r.get("difficulty") in ["Hard", "Very Hard"] else "badge-info"
-                with st.expander(f"{r['role_title']} — £{r.get('salary', 0):,}/year"):
+                with st.expander(f"**{r['role_title']}** — £{r.get('salary',0):,}/year"):
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.write(f"Typical retention: {r.get('retention_rate')}%")
-                        st.write(f"Vacancy duration: {r.get('vacancy_time')}")
+                        st.write(f"**Your typical retention:** {r.get('retention_rate')}%")
+                        st.write(f"**Difficulty to fill:** {r.get('difficulty')}")
                     with col2:
-                        st.markdown(f"Difficulty: <span class='badge {diff_badge}'>{r.get('difficulty')}</span>", unsafe_allow_html=True)
+                        st.write(f"**Typical vacancy duration:** {r.get('vacancy_time')}")
+                        st.write(f"**Living wage role:** {'Yes' if r.get('living_wage') else 'No'}")
     except:
         pass
     
-    st.markdown('<p class="section-header">Add Role</p>', unsafe_allow_html=True)
-    with st.form("baseline"):
+    # Add new role form
+    st.markdown('<p class="section-header">Add New Role</p>', unsafe_allow_html=True)
+    st.markdown('<div class="info-card">Adding baseline data for each role helps us accurately measure the impact of your partnership — comparing outcomes against your typical experience.</div>', unsafe_allow_html=True)
+    
+    with st.form("baseline_form"):
         col1, col2 = st.columns(2)
         with col1:
-            role = st.text_input("Role Title *")
-            salary = st.number_input("Annual Salary (£)", min_value=18000, max_value=80000, value=24000, step=500)
-            retention = st.slider("Typical 12-month retention %", 0, 100, 55)
+            role_title = st.text_input("Role Title *", placeholder="e.g. Healthcare Assistant")
+            salary = st.number_input("Annual Salary (£) *", min_value=15000, max_value=100000, value=24000, step=500)
+            retention = st.slider("What percentage of staff typically stay beyond 12 months in this role?", 0, 100, 60, help="Your historical retention rate for this position")
         with col2:
-            difficulty = st.selectbox("Difficulty to fill", ["Easy", "Moderate", "Hard", "Very Hard"])
-            vacancy_time = st.selectbox("Typical vacancy duration", ["< 2 weeks", "2-4 weeks", "1-2 months", "2-3 months", "3+ months"])
+            difficulty = st.selectbox("How difficult is this role to fill?", ["Easy - Usually filled within 2 weeks", "Moderate - Takes 2-4 weeks", "Hard - Takes 1-2 months", "Very Hard - Takes 2+ months or often unfilled"])
+            vacancy_time = st.selectbox("How long does this role typically stay vacant?", ["Less than 2 weeks", "2-4 weeks", "1-2 months", "2-3 months", "3+ months"])
+            living_wage = st.selectbox("Is this role paid at or above Real Living Wage (£12/hr)?", ["Yes", "No"])
+            permanent = st.selectbox("Contract type", ["Permanent", "Fixed-term", "Variable"])
         
         if st.form_submit_button("Save Role", use_container_width=True):
-            if role:
-                supabase.table("partner_baseline").insert({
-                    "partner_id": partner_id, "role_title": role, "salary": salary,
-                    "retention_rate": retention, "difficulty": difficulty,
-                    "vacancy_time": vacancy_time, "living_wage": True, "permanent": "Yes",
-                    "created_at": datetime.now().isoformat()
-                }).execute()
-                st.success("Role saved")
-                st.rerun()
+            if role_title:
+                difficulty_map = {"Easy - Usually filled within 2 weeks": "Easy", "Moderate - Takes 2-4 weeks": "Moderate", "Hard - Takes 1-2 months": "Hard", "Very Hard - Takes 2+ months or often unfilled": "Very Hard"}
+                try:
+                    supabase.table("partner_baseline").insert({
+                        "partner_id": partner_id,
+                        "role_title": role_title,
+                        "salary": salary,
+                        "retention_rate": retention,
+                        "difficulty": difficulty_map.get(difficulty, difficulty),
+                        "vacancy_time": vacancy_time,
+                        "living_wage": living_wage == "Yes",
+                        "permanent": permanent,
+                        "created_at": datetime.now().isoformat()
+                    }).execute()
+                    st.success(f"✓ {role_title} saved successfully!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error saving: {e}")
+            else:
+                st.warning("Please enter a role title")
 
-def employment_interviews():
-    st.markdown('<p class="main-header">Interview Feedback</p>', unsafe_allow_html=True)
+# ============ PARTNER INTERVIEW FEEDBACK ============
+def partner_interview_feedback():
+    st.markdown('<p class="main-header">🎤 Interview Feedback</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Record outcomes for each candidate interviewed</p>', unsafe_allow_html=True)
+    
     partner_id = st.session_state.get("user_id", 1)
     
-    with st.form("interview"):
+    # Show existing feedback summary
+    try:
+        feedback = supabase.table("interview_feedback").select("*").eq("partner_id", partner_id).execute()
+        if feedback.data:
+            hired = len([f for f in feedback.data if f.get("hired")])
+            not_hired = len([f for f in feedback.data if not f.get("hired")])
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Interviewed", len(feedback.data))
+            with col2:
+                st.metric("Hired", hired)
+            with col3:
+                st.metric("Not Hired", not_hired)
+            
+            st.markdown("**Recent Feedback:**")
+            for f in sorted(feedback.data, key=lambda x: x.get("interview_date", ""), reverse=True)[:5]:
+                status = "✅ Hired" if f.get("hired") else "❌ Not hired"
+                st.write(f"- **{f.get('candidate_name')}** for {f.get('role')} — {status} ({f.get('interview_date', 'N/A')})")
+    except:
+        pass
+    
+    # Submit new feedback
+    st.markdown('<p class="section-header">Submit Interview Feedback</p>', unsafe_allow_html=True)
+    st.markdown('<div class="info-card">Your feedback helps ACH continuously improve candidate preparation and provides valuable data for impact measurement.</div>', unsafe_allow_html=True)
+    
+    with st.form("interview_feedback_form"):
         col1, col2 = st.columns(2)
         with col1:
-            name = st.text_input("Candidate Name *")
-            role = st.text_input("Role *")
-            date = st.date_input("Interview Date", value=datetime.now())
+            candidate_name = st.text_input("Candidate Name *", placeholder="e.g. Ahmed Hassan")
+            candidate_id = st.text_input("Candidate ID (if known)", placeholder="e.g. BCH001")
+            role = st.text_input("Role Interviewed For *", placeholder="e.g. Healthcare Assistant")
         with col2:
-            hired = st.selectbox("Outcome", ["Hired", "Not Hired"])
+            interview_date = st.date_input("Interview Date *", value=datetime.now())
+            hired = st.selectbox("Outcome *", ["Yes - We are hiring this candidate", "No - We are not proceeding"])
         
-        if hired == "Hired":
-            standout = st.text_area("What made this candidate stand out?")
-            start_date = st.date_input("Start Date", value=datetime.now() + timedelta(days=14))
-            salary = st.number_input("Salary (£)", min_value=18000, max_value=80000, value=24000)
+        st.markdown("---")
+        
+        if hired == "Yes - We are hiring this candidate":
+            st.markdown("**🎉 Great news! Please tell us more:**")
+            standout = st.text_area("What made this candidate stand out? *", placeholder="e.g. Excellent communication skills, showed genuine empathy during role play, asked thoughtful questions about the role...", help="This helps ACH understand what qualities employers value and informs future training")
+            start_date = st.date_input("Expected Start Date", value=datetime.now() + timedelta(days=14))
+            salary = st.number_input("Agreed Salary (£/year)", min_value=15000, max_value=100000, value=24000, step=500)
             rejection_reason = None
+            improvement = None
         else:
-            rejection_reason = st.selectbox("Primary reason", ["Skills gap", "English proficiency", "Experience", "Availability", "Other"])
+            st.markdown("**📝 Please help us improve:**")
+            rejection_reason = st.selectbox("Primary reason for not proceeding", [
+                "Skills gap - technical skills need development",
+                "English language proficiency",
+                "Experience level not sufficient",
+                "Cultural fit concerns",
+                "Availability/shift patterns",
+                "Right to work documentation",
+                "Other"
+            ])
+            improvement = st.text_area("What could ACH do to better prepare candidates like this? *", placeholder="e.g. More focus on interview techniques, additional English language support, more exposure to workplace scenarios...", help="Your constructive feedback directly improves our training programmes")
             standout = None
             start_date = None
             salary = None
         
-        if st.form_submit_button("Submit", use_container_width=True):
-            if name and role:
-                supabase.table("interview_feedback").insert({
-                    "partner_id": partner_id, "candidate_name": name, "candidate_id": f"C{datetime.now().strftime('%H%M%S')}",
-                    "role": role, "interview_date": date.isoformat(), "hired": hired == "Hired",
-                    "standout_reason": standout, "rejection_reason": rejection_reason,
-                    "submitted_at": datetime.now().isoformat()
-                }).execute()
-                
-                if hired == "Hired" and start_date:
-                    supabase.table("placements").insert({
-                        "partner_id": partner_id, "partner_name": st.session_state.user_name,
-                        "candidate_name": name, "candidate_id": f"C{datetime.now().strftime('%H%M%S')}",
-                        "role": role, "start_date": start_date.isoformat(),
-                        "salary": salary, "hourly_rate": round(salary/1950, 2),
-                        "contract_type": "Permanent", "status": "Active",
-                        "created_at": datetime.now().isoformat()
-                    }).execute()
-                
-                st.success("Submitted")
-                st.rerun()
-
-def employment_milestones():
-    st.markdown('<p class="main-header">Milestone Reviews</p>', unsafe_allow_html=True)
-    partner_id = st.session_state.get("user_id", 1)
-    
-    try:
-        placements = supabase.table("placements").select("*").eq("partner_id", partner_id).eq("status", "Active").execute()
-        if not placements.data:
-            st.info("No active placements")
-            return
-        
-        pending = []
-        for p in placements.data:
-            if p.get("start_date"):
-                months = (datetime.now() - datetime.fromisoformat(p["start_date"])).days / 30
-                for milestone in [3, 6, 12]:
-                    if months >= milestone:
-                        rev = supabase.table("milestone_reviews_partner").select("id").eq("placement_id", p["id"]).eq("milestone_month", milestone).execute()
-                        if not rev.data:
-                            pending.append({"placement": p, "milestone": milestone})
-        
-        if not pending:
-            st.success("All reviews complete")
-            return
-        
-        st.markdown(f'<div class="alert-card">{len(pending)} review(s) pending</div>', unsafe_allow_html=True)
-        
-        for item in pending:
-            p = item["placement"]
-            with st.expander(f"**{p['candidate_name']}** — {item['milestone']}-month review"):
-                with st.form(f"review_{p['id']}_{item['milestone']}"):
-                    employed = st.selectbox("Still employed?", ["Yes", "No"], key=f"e_{p['id']}_{item['milestone']}")
+        if st.form_submit_button("Submit Feedback", use_container_width=True):
+            if candidate_name and role:
+                try:
+                    data = {
+                        "partner_id": partner_id,
+                        "candidate_id": candidate_id or f"CAND_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                        "candidate_name": candidate_name,
+                        "role": role,
+                        "interview_date": interview_date.isoformat(),
+                        "hired": hired == "Yes - We are hiring this candidate",
+                        "rejection_reason": rejection_reason,
+                        "improvement_feedback": improvement,
+                        "standout_reason": standout,
+                        "submitted_at": datetime.now().isoformat()
+                    }
+                    supabase.table("interview_feedback").insert(data).execute()
                     
-                    if employed == "Yes":
-                        performance = st.selectbox("Performance", ["Excellent", "Good", "Satisfactory", "Needs improvement"], key=f"p_{p['id']}_{item['milestone']}")
-                        training = st.selectbox("Training provided?", ["Yes", "No"], key=f"t_{p['id']}_{item['milestone']}")
-                        training_type = st.text_input("Training details", key=f"tt_{p['id']}_{item['milestone']}") if training == "Yes" else None
-                        progression = st.selectbox("Progression support (promotion, pay rise, study support)?", ["Yes", "No"], key=f"pr_{p['id']}_{item['milestone']}")
-                        progression_details = st.text_input("Details", key=f"pd_{p['id']}_{item['milestone']}") if progression == "Yes" else None
-                        quote = st.text_area("Observation about this employee's contribution", key=f"q_{p['id']}_{item['milestone']}")
+                    # If hired, create placement
+                    if hired == "Yes - We are hiring this candidate" and start_date and salary:
+                        partner_name = st.session_state.user_name
+                        hourly = round(salary / 1950, 2)
+                        placement_data = {
+                            "partner_id": partner_id,
+                            "partner_name": partner_name,
+                            "candidate_id": candidate_id or data["candidate_id"],
+                            "candidate_name": candidate_name,
+                            "role": role,
+                            "start_date": start_date.isoformat(),
+                            "salary": salary,
+                            "hourly_rate": hourly,
+                            "contract_type": "Permanent",
+                            "status": "Active",
+                            "created_at": datetime.now().isoformat()
+                        }
+                        supabase.table("placements").insert(placement_data).execute()
+                        st.success(f"✓ Feedback submitted and {candidate_name} added to your team!")
                     else:
-                        performance = training = training_type = progression = progression_details = quote = None
-                        leaving_reason = st.selectbox("Reason", ["Resigned", "Contract ended", "Performance", "Other"], key=f"lr_{p['id']}_{item['milestone']}")
-                    
-                    if st.form_submit_button("Submit Review"):
-                        supabase.table("milestone_reviews_partner").insert({
-                            "placement_id": p['id'], "partner_id": partner_id,
-                            "milestone_month": item['milestone'], "still_employed": employed == "Yes",
-                            "performance": performance, "received_training": training == "Yes" if training else False,
-                            "training_type": training_type, "progression": progression == "Yes" if progression else False,
-                            "progression_details": progression_details, "contribution_quote": quote,
-                            "submitted_at": datetime.now().isoformat()
-                        }).execute()
-                        
-                        if employed == "No":
-                            supabase.table("placements").update({"status": "Left"}).eq("id", p['id']).execute()
-                        
-                        st.success("Review submitted")
-                        st.rerun()
-    except Exception as e:
-        st.error(f"Error: {e}")
+                        st.success("✓ Feedback submitted. Thank you for helping us improve.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+            else:
+                st.warning("Please complete all required fields")
 
-# ============ TRAINING DASHBOARD ============
-def training_dashboard():
-    st.markdown(f'<p class="main-header">{st.session_state.user_name}</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Cultural Competence Training Impact</p>', unsafe_allow_html=True)
+# ============ PARTNER MILESTONE REVIEWS ============
+def partner_milestone_reviews():
+    st.markdown('<p class="main-header">📅 Milestone Reviews</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Provide updates on employee progress at 3, 6 and 12 months</p>', unsafe_allow_html=True)
     
-    partner_id = st.session_state.get("user_id", 101)
+    partner_id = st.session_state.get("user_id", 1)
+    pending = get_pending_reviews(partner_id)
     
-    # Demo scores
-    pre_scores = {"Knowledge": 2.4, "Awareness": 2.6, "Confidence": 2.3, "Psych Safety": 3.0, "Refugee Employment": 2.2}
-    post_scores = {"Knowledge": 4.1, "Awareness": 4.0, "Confidence": 3.9, "Psych Safety": 4.2, "Refugee Employment": 3.8}
-    total_trained = 87
-    sessions_count = 3
+    # Show completed reviews count
+    try:
+        completed = supabase.table("milestone_reviews_partner").select("id").eq("partner_id", partner_id).execute()
+        st.metric("Reviews Completed", len(completed.data) if completed.data else 0)
+    except:
+        pass
     
-    sections = {
-        "Knowledge": {"weight": 0.15},
-        "Awareness": {"weight": 0.15},
-        "Confidence": {"weight": 0.20},
-        "Psych Safety": {"weight": 0.10},
-        "Refugee Employment": {"weight": 0.15},
-        "Infrastructure": {"weight": 0.25}
-    }
+    if not pending:
+        st.markdown('<div class="success-card">✓ All milestone reviews are up to date!</div>', unsafe_allow_html=True)
+        return
     
-    # Staff capability composite (without infrastructure)
-    staff_sections = ["Knowledge", "Awareness", "Confidence", "Psych Safety", "Refugee Employment"]
-    staff_composite = sum(convert_to_100(post_scores[s]) * sections[s]["weight"] for s in staff_sections)
+    st.markdown('<div class="info-card">Milestone reviews are essential for tracking employee progress and generating your impact reports. Please complete all pending reviews.</div>', unsafe_allow_html=True)
     
-    # Infrastructure score (from assessment)
-    infra_score = 75
+    st.markdown(f'<p class="section-header">⚠️ {len(pending)} Review(s) Pending</p>', unsafe_allow_html=True)
     
-    # Combined Inclusion Capability Score (staff capability + infrastructure)
-    inclusion_capability_score = round(staff_composite + (infra_score * sections["Infrastructure"]["weight"]))
+    for review in pending:
+        with st.expander(f"**{review['name']}** — {review['milestone']}-month review", expanded=len(pending)==1):
+            st.write(f"**Role:** {review['role']}")
+            st.write(f"**Start Date:** {review['start_date']}")
+            
+            with st.form(f"review_{review['placement_id']}_{review['milestone']}"):
+                st.markdown("##### Employment Status")
+                still_employed = st.selectbox("Is this employee still working with you?", ["Yes", "No"], key=f"emp_{review['placement_id']}_{review['milestone']}")
+                
+                if still_employed == "No":
+                    leaving_date = st.date_input("When did they leave?", key=f"leave_date_{review['placement_id']}_{review['milestone']}")
+                    leaving_reason = st.selectbox("Reason for leaving", ["Resigned - personal reasons", "Resigned - found other employment", "Resigned - returned to education", "Contract ended", "Performance issues", "Redundancy", "Other"], key=f"leave_reason_{review['placement_id']}_{review['milestone']}")
+                    performance = None
+                    training = False
+                    training_type = None
+                    progression = False
+                    progression_details = None
+                    support = []
+                    quote = None
+                else:
+                    leaving_date = None
+                    leaving_reason = None
+                    
+                    st.markdown("##### Performance & Development")
+                    performance = st.selectbox("How would you rate their overall performance?", ["Excellent - Exceeds expectations", "Good - Meets all expectations", "Satisfactory - Meets most expectations", "Needs improvement"], key=f"perf_{review['placement_id']}_{review['milestone']}")
+                    
+                    training = st.selectbox("Have they received any training since starting/last review?", ["Yes", "No"], key=f"train_{review['placement_id']}_{review['milestone']}")
+                    training_type = None
+                    if training == "Yes":
+                        training_type = st.text_input("What training did they complete?", placeholder="e.g. Manual handling, Food safety Level 2", key=f"train_type_{review['placement_id']}_{review['milestone']}")
+                    
+                    progression = st.selectbox("Has this employee received a promotion, pay rise, or increased responsibilities?", ["Yes", "No"], key=f"prog_{review['placement_id']}_{review['milestone']}")
+                    progression_details = None
+                    if progression == "Yes":
+                        progression_details = st.text_input("Please describe", placeholder="e.g. Promoted to Senior HCA, Pay increased to £25,000", key=f"prog_detail_{review['placement_id']}_{review['milestone']}")
+                    
+                    st.markdown("##### Support Provided")
+                    support = st.multiselect("What support have you provided?", ["Mentoring or buddy system", "Language support", "Additional training", "Flexible working arrangements", "Reasonable adjustments", "Wellbeing support", "Other"], key=f"support_{review['placement_id']}_{review['milestone']}")
+                    
+                    st.markdown("##### Success Story")
+                    quote = st.text_area("Share a success story or highlight about this employee (optional)", placeholder="e.g. Ahmed has become indispensable on our ward. Patients ask for him by name and his colleagues rely on him.", key=f"quote_{review['placement_id']}_{review['milestone']}", help="These stories feature in your impact reports and help demonstrate the value of the partnership")
+                
+                if st.form_submit_button("Submit Review", use_container_width=True):
+                    try:
+                        perf_map = {"Excellent - Exceeds expectations": "Excellent", "Good - Meets all expectations": "Good", "Satisfactory - Meets most expectations": "Satisfactory", "Needs improvement": "Needs improvement"}
+                        data = {
+                            "placement_id": review['placement_id'],
+                            "partner_id": partner_id,
+                            "milestone_month": review['milestone'],
+                            "still_employed": still_employed == "Yes",
+                            "leaving_date": leaving_date.isoformat() if leaving_date else None,
+                            "leaving_reason": leaving_reason,
+                            "performance": perf_map.get(performance, performance) if performance else None,
+                            "received_training": training == "Yes" if training else False,
+                            "training_type": training_type,
+                            "progression": progression == "Yes" if progression else False,
+                            "progression_details": progression_details,
+                            "support_provided": json.dumps(support) if support else None,
+                            "contribution_quote": quote,
+                            "submitted_at": datetime.now().isoformat()
+                        }
+                        supabase.table("milestone_reviews_partner").insert(data).execute()
+                        
+                        # Update placement status if left
+                        if still_employed == "No":
+                            supabase.table("placements").update({"status": "Left"}).eq("id", review['placement_id']).execute()
+                        
+                        st.success("✓ Review submitted successfully!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+
+# ============ PARTNER REPORTS ============
+def partner_reports():
+    st.markdown('<p class="main-header">📑 Impact Report</p>', unsafe_allow_html=True)
+    m = calculate_metrics(st.session_state.get("user_id", 1))
     
-    # Single Score Card
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown(render_score_card(
-            "Inclusion Capability Score",
-            inclusion_capability_score,
-            "Staff capability + organisational infrastructure"
-        ), unsafe_allow_html=True)
-        st.caption(f"ACH Training Cohort Average: 68")
+    if m["total"] == 0:
+        st.warning("No data yet. Once you have placed candidates and submitted reviews, your impact report will be generated here.")
+        return
     
-    st.markdown("")
-    st.markdown(f'<div class="info-card">Based on <strong>{total_trained} staff trained</strong> across <strong>{sessions_count} sessions</strong></div>', unsafe_allow_html=True)
+    st.markdown(f'''<div class="highlight-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div><div style="opacity:0.8;font-size:0.9rem;">IMPACT REPORT Q4 2024</div><div style="font-size:1.3rem;font-weight:600;margin-top:4px;">{st.session_state.user_name}</div></div>
+            <div style="text-align:right;"><div class="highlight-value">{m["active"]}</div><div class="highlight-label">Lives Changed</div></div>
+        </div>
+    </div>''', unsafe_allow_html=True)
     
-    # Score Components
-    st.markdown('<p class="section-header">Score Components</p>', unsafe_allow_html=True)
+    st.markdown("### Executive Summary")
+    st.markdown(f"""Through your partnership with ACH's Bridge to Employment programme, your organisation has created **{m["total"]} employment opportunities** for talented individuals from refugee and migrant backgrounds.
+
+**Key Achievements:**
+- 📈 **{m["retention"]}% retention rate** — {m["improvement"]}% above your baseline
+- 💰 **£{m["savings"]:,} estimated savings** from reduced turnover
+- 🎓 **{m["training"]} training completions** invested in development
+- ⭐ **{m["progressions"]} career progressions** including promotions and pay rises
+- ✓ **{m["living_wage"]}% living wage roles** demonstrating fair pay commitment""")
     
     col1, col2 = st.columns(2)
-    
     with col1:
-        st.markdown("**Staff Capability**")
-        for section in staff_sections:
-            pre_val = convert_to_100(pre_scores[section])
-            post_val = convert_to_100(post_scores[section])
-            change = post_val - pre_val
-            st.markdown(f'''
-            <div class="domain-score">
-                <div class="domain-label">{section}</div>
-                <div class="domain-bar"><div class="domain-fill" style="width: {post_val}%; background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);"></div></div>
-                <div class="domain-value">{round(post_val)}</div>
-            </div>
-            ''', unsafe_allow_html=True)
-    
+        st.markdown("**Workforce Impact**")
+        st.write(f"- Total Placements: **{m['total']}**")
+        st.write(f"- Currently Employed: **{m['active']}**")
+        st.write(f"- Retention Rate: **{m['retention']}%**")
+        st.write(f"- Average Tenure: **{m['tenure']} months**")
     with col2:
-        st.markdown("**Organisational Infrastructure**")
-        st.markdown(f'''
-        <div class="metric-card">
-            <div class="metric-label">Infrastructure Score</div>
-            <div class="metric-value">{infra_score}</div>
-            <div class="metric-detail">Policies, practices & support systems</div>
-        </div>
-        ''', unsafe_allow_html=True)
-        st.markdown("")
-        st.markdown("Infrastructure measures:")
-        st.markdown("- Recruitment bias review")
-        st.markdown("- Accessible job descriptions")
-        st.markdown("- Alternative qualification recognition")
-        st.markdown("- Adapted onboarding")
-        st.markdown("- Language support available")
-        st.markdown("- Manager training")
-        st.markdown("- Flexible policies")
-        st.markdown("- Clear progression pathways")
-
-# ============ TRAINING FORMS ============
-def training_pre_survey():
-    st.markdown('<p class="main-header">Pre-Training Survey</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Baseline assessment before training</p>', unsafe_allow_html=True)
+        st.markdown("**Business Value**")
+        st.write(f"- Hard-to-Fill Roles: **{m['hard_roles']}**")
+        st.write(f"- Cost Savings: **£{m['savings']:,}**")
+        st.write(f"- Living Wage Roles: **{m['living_wage']}%**")
+        st.write(f"- Career Progressions: **{m['progressions']}**")
     
-    partner_id = st.session_state.get("user_id", 101)
+    if m["employer_quotes"]:
+        st.markdown("### Success Stories")
+        for q, n in m["employer_quotes"][:3]:
+            st.markdown(f'> "{q}"')
+            if n:
+                st.caption(f"— About {n}")
     
-    st.markdown('<div class="info-card">Each attendee uses their unique code to link pre, post and follow-up responses.</div>', unsafe_allow_html=True)
+    if m["candidate_quotes"]:
+        st.markdown("### Employee Voices")
+        for q, n in m["candidate_quotes"][:3]:
+            st.markdown(f'> "{q}"')
+            if n:
+                st.caption(f"— {n}")
     
-    with st.form("pre_survey"):
-        col1, col2 = st.columns(2)
-        with col1:
-            session_date = st.date_input("Training Date", value=datetime.now())
-            attendee_code = st.text_input("Attendee Code *", placeholder="e.g. NHS-001")
-        with col2:
-            department = st.text_input("Department")
-        
-        st.markdown("### Section A: Knowledge")
-        q1 = st.select_slider("1. I understand the legal rights of refugees and asylum seekers in the UK", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q2 = st.select_slider("2. I can explain the difference between a refugee, asylum seeker, and migrant", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q3 = st.select_slider("3. I understand the main barriers refugees face in accessing services/employment", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q4 = st.select_slider("4. I am aware of how trauma may affect behaviour and communication", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        
-        st.markdown("### Section B: Awareness")
-        q5 = st.select_slider("5. I am aware of my own cultural assumptions and biases", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q6 = st.select_slider("6. I recognise that people from different backgrounds may experience our organisation differently", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q7 = st.select_slider("7. I understand that treating everyone 'the same' may not result in equal outcomes", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q8 = st.select_slider("8. I notice when colleagues or systems may unintentionally exclude people from different backgrounds", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        
-        st.markdown("### Section C: Confidence & Skills")
-        q9 = st.select_slider("9. I feel confident supporting colleagues or service users from refugee backgrounds", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q10 = st.select_slider("10. I can adapt my communication style for people with different English proficiency levels", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q11 = st.select_slider("11. I know what to do if I witness discrimination or exclusion", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q12 = st.select_slider("12. I feel able to ask respectful questions about someone's cultural background or needs", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        
-        st.markdown("### Section D: Psychological Safety")
-        q13 = st.select_slider("13. In my team, it is safe to raise concerns about inclusion without fear of negative consequences", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q14 = st.select_slider("14. People in my team are not rejected for being different", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q15 = st.select_slider("15. My colleagues value diverse perspectives and experiences", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        
-        st.markdown("### Section E: Refugee Employment")
-        q16 = st.select_slider("16. I understand how refugee candidates may have skills and experience not reflected in a traditional CV", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q17 = st.select_slider("17. I recognise that standard recruitment processes may unintentionally disadvantage refugee candidates", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q18 = st.select_slider("18. I feel confident interviewing or assessing candidates from refugee backgrounds fairly", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q19 = st.select_slider("19. I know how to support a refugee colleague navigating UK workplace culture for the first time", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        q20 = st.select_slider("20. I am aware of practical barriers refugee employees may face", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        
-        if st.form_submit_button("Submit Pre-Training Survey", use_container_width=True):
-            if attendee_code:
-                try:
-                    supabase.table("training_pre_survey").insert({
-                        "partner_id": partner_id, "attendee_code": attendee_code,
-                        "session_date": session_date.isoformat(), "department": department,
-                        "q1": q1, "q2": q2, "q3": q3, "q4": q4,
-                        "q5": q5, "q6": q6, "q7": q7, "q8": q8,
-                        "q9": q9, "q10": q10, "q11": q11, "q12": q12,
-                        "q13": q13, "q14": q14, "q15": q15,
-                        "q16": q16, "q17": q17, "q18": q18, "q19": q19, "q20": q20,
-                        "submitted_at": datetime.now().isoformat()
-                    }).execute()
-                    st.success("Pre-training survey submitted")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-def training_post_survey():
-    st.markdown('<p class="main-header">Post-Training Survey</p>', unsafe_allow_html=True)
-    partner_id = st.session_state.get("user_id", 101)
+    st.markdown("### Diversity & Inclusion Impact")
+    st.markdown(f"""Your organisation has welcomed **{m['active']} employees** from refugee and migrant backgrounds, demonstrating genuine commitment to workforce diversity and inclusive hiring practices.""")
     
-    with st.form("post_survey"):
-        attendee_code = st.text_input("Attendee Code *", placeholder="Same code as pre-training")
-        
-        st.markdown("### Please rate your agreement after completing the training")
-        
-        questions = [
-            "1. I understand the legal rights of refugees and asylum seekers in the UK",
-            "2. I can explain the difference between a refugee, asylum seeker, and migrant",
-            "3. I understand the main barriers refugees face in accessing services/employment",
-            "4. I am aware of how trauma may affect behaviour and communication",
-            "5. I am aware of my own cultural assumptions and biases",
-            "6. I recognise that people from different backgrounds may experience our organisation differently",
-            "7. I understand that treating everyone 'the same' may not result in equal outcomes",
-            "8. I notice when colleagues or systems may unintentionally exclude people",
-            "9. I feel confident supporting colleagues or service users from refugee backgrounds",
-            "10. I can adapt my communication style for different English proficiency levels",
-            "11. I know what to do if I witness discrimination or exclusion",
-            "12. I feel able to ask respectful questions about someone's cultural background",
-            "13. In my team, it is safe to raise concerns about inclusion",
-            "14. People in my team are not rejected for being different",
-            "15. My colleagues value diverse perspectives and experiences",
-            "16. I understand how refugee candidates may have skills not reflected in a CV",
-            "17. I recognise that standard recruitment may disadvantage refugee candidates",
-            "18. I feel confident assessing candidates from refugee backgrounds fairly",
-            "19. I know how to support a refugee colleague navigating UK workplace culture",
-            "20. I am aware of practical barriers refugee employees may face"
-        ]
-        
-        responses = []
-        for i, q in enumerate(questions):
-            responses.append(st.select_slider(q, options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key=f"post_q{i+1}"))
-        
-        commitment = st.text_area("I commit to applying my learning by...", placeholder="e.g. Being more mindful of assumptions...")
-        
-        if st.form_submit_button("Submit Post-Training Survey", use_container_width=True):
-            if attendee_code:
-                data = {"partner_id": partner_id, "attendee_code": attendee_code, "commitment": commitment, "submitted_at": datetime.now().isoformat()}
-                for i, r in enumerate(responses):
-                    data[f"q{i+1}"] = r
-                supabase.table("training_post_survey").insert(data).execute()
-                st.success("Post-training survey submitted")
-
-def training_followup():
-    st.markdown('<p class="main-header">3-Month Follow-up</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Measuring sustained learning and organisational change</p>', unsafe_allow_html=True)
-    
-    partner_id = st.session_state.get("user_id", 101)
-    
-    with st.form("followup"):
-        attendee_code = st.text_input("Attendee Code *", placeholder="Same code used in pre/post surveys")
-        
-        st.markdown("---")
-        st.markdown("### Section A: Sustained Confidence")
-        st.caption("Rate your current confidence (same questions as post-training)")
-        
-        q9 = st.select_slider("I feel confident supporting colleagues or service users from refugee backgrounds", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="fu_q9")
-        q10 = st.select_slider("I can adapt my communication style for people with different English proficiency levels", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="fu_q10")
-        q18 = st.select_slider("I feel confident interviewing or assessing candidates from refugee backgrounds fairly", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="fu_q18")
-        q19 = st.select_slider("I know how to support a refugee colleague navigating UK workplace culture", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="fu_q19")
-        
-        st.markdown("---")
-        st.markdown("### Section B: Applied Learning")
-        
-        applied_example = st.text_area(
-            "Describe a specific situation where you applied your learning",
-            placeholder="E.g., 'I changed how I conduct interviews by...', 'I supported a colleague by...', 'I advocated for a policy change...'",
-            help="Be specific about what you did differently as a result of the training"
-        )
-        
-        applied_frequency = st.select_slider(
-            "How often have you applied your learning from the training?",
-            options=[1,2,3,4,5],
-            value=3,
-            format_func=lambda x: ["Never", "Once or twice", "A few times", "Regularly", "Very frequently"][x-1]
-        )
-        
-        st.markdown("---")
-        st.markdown("### Section C: Organisational Changes Observed")
-        
-        org_recruitment = st.select_slider("Our recruitment processes have become more inclusive for refugee candidates", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        org_onboarding = st.select_slider("Our onboarding has been adapted to better support refugee employees", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        org_support = st.select_slider("There is more support available for refugee employees than before", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        org_culture = st.select_slider("The overall culture has become more welcoming to people from refugee backgrounds", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        
-        specific_changes = st.text_area(
-            "What specific organisational changes have you observed since the training?",
-            placeholder="E.g., 'New translated materials', 'Buddy system introduced', 'Flexible policy for immigration appointments'..."
-        )
-        
-        st.markdown("---")
-        st.markdown("### Section D: Barriers & Recommendations")
-        
-        barriers = st.text_area(
-            "What barriers (if any) have prevented you from applying your learning?",
-            placeholder="E.g., 'Lack of time', 'No opportunities', 'Need more manager support'..."
-        )
-        
-        recommendations = st.text_area(
-            "What additional support would help your organisation become more inclusive?",
-            placeholder="E.g., 'Refresher training', 'Manager-specific session', 'Resources for team meetings'..."
-        )
-        
-        if st.form_submit_button("Submit 3-Month Follow-up", use_container_width=True):
-            if attendee_code:
-                # Calculate scores
-                confidence_avg = (q9 + q10 + q18 + q19) / 4
-                org_change_avg = (org_recruitment + org_onboarding + org_support + org_culture) / 4
-                behaviour_code = 2 if len(applied_example) > 100 else (1 if len(applied_example) > 20 else 0)
-                
-                try:
-                    supabase.table("training_followup").insert({
-                        "partner_id": partner_id,
-                        "attendee_code": attendee_code,
-                        "confidence_q9": q9,
-                        "confidence_q10": q10,
-                        "confidence_q18": q18,
-                        "confidence_q19": q19,
-                        "confidence_avg": confidence_avg,
-                        "applied_learning_text": applied_example,
-                        "applied_learning_code": behaviour_code,
-                        "applied_frequency": applied_frequency,
-                        "org_recruitment": org_recruitment,
-                        "org_onboarding": org_onboarding,
-                        "org_support": org_support,
-                        "org_culture": org_culture,
-                        "org_change_avg": org_change_avg,
-                        "specific_changes": specific_changes,
-                        "barriers": barriers,
-                        "recommendations": recommendations,
-                        "submitted_at": datetime.now().isoformat()
-                    }).execute()
-                    st.success("3-month follow-up submitted successfully")
-                except Exception as e:
-                    st.error(f"Error submitting: {e}")
-            else:
-                st.warning("Please enter your attendee code")
-
-def training_staff_feedback():
-    st.markdown('<p class="main-header">Organisational Inclusion Climate Survey</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Staff perception of workplace inclusion culture</p>', unsafe_allow_html=True)
-    
-    partner_id = st.session_state.get("user_id", 101)
-    
-    st.markdown('<div class="info-card">This survey measures your organisation\'s inclusion climate from the perspective of all staff — not just training attendees. Responses are anonymous and help identify strengths and areas for development.</div>', unsafe_allow_html=True)
-    
-    with st.form("staff_feedback"):
-        st.markdown("### Demographics")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            department = st.text_input("Department *")
-            role_level = st.selectbox("Role Level", ["Frontline Staff", "Team Leader/Supervisor", "Middle Manager", "Senior Manager", "Director/Executive"])
-        with col2:
-            time_in_role = st.selectbox("Time in Organisation", ["< 6 months", "6-12 months", "1-2 years", "2-5 years", "5+ years"])
-            line_management = st.selectbox("Do you manage others?", ["Yes", "No"])
-        with col3:
-            attended_training = st.selectbox("Attended ACH inclusion training?", ["Yes - within last 3 months", "Yes - over 3 months ago", "No", "Scheduled to attend"])
-            contact_frequency = st.selectbox("How often do you interact with service users/public?", ["Daily", "Weekly", "Monthly", "Rarely", "Never"])
-        
-        st.markdown("---")
-        st.markdown("### Section A: Organisational Commitment to Inclusion")
-        st.caption("Rate your agreement with each statement about your organisation")
-        
-        oc1 = st.select_slider("A1. My organisation demonstrates a genuine commitment to diversity and inclusion", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="oc1")
-        oc2 = st.select_slider("A2. Senior leadership visibly champions inclusion initiatives", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="oc2")
-        oc3 = st.select_slider("A3. Resources are allocated to support diversity and inclusion efforts", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="oc3")
-        oc4 = st.select_slider("A4. Inclusion is embedded in our policies and procedures, not just statements", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="oc4")
-        oc5 = st.select_slider("A5. My organisation takes meaningful action when discrimination occurs", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="oc5")
-        
-        st.markdown("---")
-        st.markdown("### Section B: Team Climate")
-        st.caption("Rate your agreement with each statement about your immediate team")
-        
-        tc1 = st.select_slider("B1. In my team, people from all backgrounds are treated with equal respect", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="tc1")
-        tc2 = st.select_slider("B2. My team would be welcoming to a new colleague from a refugee background", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="tc2")
-        tc3 = st.select_slider("B3. Team members are willing to adapt their communication style for colleagues with different English proficiency", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="tc3")
-        tc4 = st.select_slider("B4. Different perspectives and experiences are valued in team discussions", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="tc4")
-        tc5 = st.select_slider("B5. I would feel comfortable raising concerns about exclusionary behaviour in my team", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="tc5")
-        
-        st.markdown("---")
-        st.markdown("### Section C: Personal Readiness")
-        st.caption("Rate your agreement with each statement about yourself")
-        
-        pr1 = st.select_slider("C1. I feel confident in my ability to work effectively with colleagues from refugee backgrounds", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="pr1")
-        pr2 = st.select_slider("C2. I understand the specific challenges that refugees may face in the workplace", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="pr2")
-        pr3 = st.select_slider("C3. I know where to access support or resources if I needed to help a colleague from a refugee background", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="pr3")
-        pr4 = st.select_slider("C4. I am aware of my own cultural assumptions and how they might affect my interactions", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="pr4")
-        pr5 = st.select_slider("C5. I would feel comfortable asking respectful questions to understand a colleague's cultural background or needs", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="pr5")
-        
-        st.markdown("---")
-        st.markdown("### Section D: Perceived Barriers")
-        st.caption("Rate your agreement with each statement about potential barriers")
-        
-        pb1 = st.select_slider("D1. Language differences would make it difficult to work with colleagues from refugee backgrounds", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="pb1")
-        pb2 = st.select_slider("D2. Cultural differences would create challenges in team dynamics", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="pb2")
-        pb3 = st.select_slider("D3. Our current workload makes it difficult to provide additional support to new colleagues who may need it", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="pb3")
-        pb4 = st.select_slider("D4. There is insufficient management support for inclusion initiatives", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="pb4")
-        
-        st.markdown("---")
-        st.markdown("### Section E: Training & Development Needs")
-        
-        tn1 = st.select_slider("E1. I would benefit from training on supporting colleagues from refugee backgrounds", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="tn1")
-        tn2 = st.select_slider("E2. My manager would benefit from training on inclusive leadership", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="tn2")
-        tn3 = st.select_slider("E3. Our team would benefit from guidance on inclusive practices", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="tn3")
-        
-        training_topics = st.multiselect("What topics would be most useful for you? (select all that apply)", [
-            "Understanding refugee experiences and challenges",
-            "Cross-cultural communication",
-            "Unconscious bias awareness",
-            "Inclusive recruitment practices",
-            "Supporting colleagues with trauma histories",
-            "Language and communication adaptation",
-            "Legal rights of refugees and asylum seekers",
-            "Practical workplace adjustments"
-        ])
-        
-        st.markdown("---")
-        st.markdown("### Section F: Open Feedback")
-        
-        positive_observation = st.text_area("Describe a positive example of inclusion you have observed in your workplace (optional)", placeholder="E.g., 'A colleague took time to explain workplace customs...', 'Our team adapted meeting formats to be more inclusive...'")
-        
-        barriers_observed = st.text_area("What barriers to inclusion have you observed or experienced? (optional)", placeholder="E.g., 'Lack of translated materials', 'Assumptions about qualifications', 'Social exclusion'...")
-        
-        recommendations = st.text_area("What would help your organisation become more inclusive for refugee employees? (optional)", placeholder="E.g., 'Buddy system', 'Manager training', 'Flexible policies', 'Better onboarding'...")
-        
-        if st.form_submit_button("Submit Survey", use_container_width=True):
-            if department:
-                org_commitment_avg = (oc1 + oc2 + oc3 + oc4 + oc5) / 5
-                team_climate_avg = (tc1 + tc2 + tc3 + tc4 + tc5) / 5
-                personal_readiness_avg = (pr1 + pr2 + pr3 + pr4 + pr5) / 5
-                perceived_barriers_avg = (pb1 + pb2 + pb3 + pb4) / 4
-                training_need_avg = (tn1 + tn2 + tn3) / 3
-                
-                # Overall inclusion climate (barriers reverse scored)
-                inclusion_climate = (org_commitment_avg + team_climate_avg + personal_readiness_avg + (6 - perceived_barriers_avg)) / 4
-                
-                try:
-                    supabase.table("training_staff_feedback").insert({
-                        "partner_id": partner_id,
-                        "department": department,
-                        "role_level": role_level,
-                        "time_in_role": time_in_role,
-                        "line_management": line_management == "Yes",
-                        "attended_training": attended_training,
-                        "contact_frequency": contact_frequency,
-                        "oc1": oc1, "oc2": oc2, "oc3": oc3, "oc4": oc4, "oc5": oc5,
-                        "org_commitment_avg": org_commitment_avg,
-                        "tc1": tc1, "tc2": tc2, "tc3": tc3, "tc4": tc4, "tc5": tc5,
-                        "team_climate_avg": team_climate_avg,
-                        "pr1": pr1, "pr2": pr2, "pr3": pr3, "pr4": pr4, "pr5": pr5,
-                        "personal_readiness_avg": personal_readiness_avg,
-                        "pb1": pb1, "pb2": pb2, "pb3": pb3, "pb4": pb4,
-                        "perceived_barriers_avg": perceived_barriers_avg,
-                        "tn1": tn1, "tn2": tn2, "tn3": tn3,
-                        "training_need_avg": training_need_avg,
-                        "training_topics": ",".join(training_topics) if training_topics else None,
-                        "inclusion_climate_score": inclusion_climate,
-                        "positive_observation": positive_observation,
-                        "barriers_observed": barriers_observed,
-                        "recommendations": recommendations,
-                        "submitted_at": datetime.now().isoformat()
-                    }).execute()
-                    st.success("Thank you for completing the Inclusion Climate Survey")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-            else:
-                st.warning("Please enter your department")
-
-def training_infrastructure():
-    st.markdown('<p class="main-header">Infrastructure Assessment</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Organisational policies and practices (HR/Leadership)</p>', unsafe_allow_html=True)
-    
-    partner_id = st.session_state.get("user_id", 101)
-    
-    with st.form("infrastructure"):
-        st.markdown("### Refugee Employment Readiness")
-        
-        items = [
-            ("i1", "Recruitment processes reviewed for bias against refugee candidates"),
-            ("i2", "Job descriptions use accessible language and focus on core competencies"),
-            ("i3", "Alternative evidence accepted for skills/qualifications (not just UK credentials)"),
-            ("i4", "Onboarding adapted for employees unfamiliar with UK workplace norms"),
-            ("i5", "Language support available (translated materials, speaking pace, buddying)"),
-            ("i6", "Managers trained on supporting refugee employees"),
-            ("i7", "Flexible policies for employees with asylum/immigration appointments"),
-            ("i8", "Clear progression pathways communicated accessibly")
-        ]
-        
-        responses = {}
-        for key, label in items:
-            responses[key] = st.selectbox(label, ["No", "Partial", "Yes"], key=key)
-        
-        st.markdown("### Additional Information")
-        refugees_interviewed = st.number_input("Refugee candidates interviewed since last assessment", min_value=0, value=0)
-        refugees_hired = st.number_input("Refugee employees hired since last assessment", min_value=0, value=0)
-        changes_made = st.text_area("Policy or process changes made since training")
-        
-        if st.form_submit_button("Submit Assessment", use_container_width=True):
-            score_map = {"No": 0, "Partial": 1, "Yes": 2}
-            total = sum(score_map[v] for v in responses.values())
-            score = round((total / 16) * 100)
-            
-            data = {"partner_id": partner_id, "total_score": score,
-                    "refugees_interviewed": refugees_interviewed, "refugees_hired": refugees_hired,
-                    "changes_made": changes_made, "submitted_at": datetime.now().isoformat()}
-            for key, val in responses.items():
-                data[f"{key}_recruitment_bias" if key == "i1" else key] = val
-            
-            supabase.table("training_infrastructure").insert(data).execute()
-            st.success(f"Assessment submitted. Infrastructure Score: {score}/100")
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.button("📥 Download Full Report (PDF)", use_container_width=True, disabled=True, help="PDF generation coming soon")
 
 # ============ ACH STAFF DASHBOARD ============
 def ach_dashboard():
-    st.markdown('<p class="main-header">ACH Programme Dashboard</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Strategic overview of all partnerships</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-header">📊 Programme Dashboard</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Overview of all partnerships and placements</p>', unsafe_allow_html=True)
     
-    tab1, tab2, tab3 = st.tabs(["Employment Programme", "Training Programme", "Combined Impact"])
-    
-    with tab1:
-        ach_employment_overview()
-    
-    with tab2:
-        ach_training_overview()
-    
-    with tab3:
-        ach_combined_impact()
-
-def ach_employment_overview():
-    # Aggregate stats
     try:
         partners = supabase.table("impact_partners").select("*").execute()
         placements = supabase.table("placements").select("*").execute()
         reviews = supabase.table("milestone_reviews_partner").select("*").execute()
         
-        total_partners = len(partners.data) if partners.data else 6
-        total_placements = len(placements.data) if placements.data else 20
-        active = len([p for p in placements.data if p.get("status") == "Active"]) if placements.data else 18
-        retention = round((active / total_placements) * 100) if total_placements > 0 else 90
-        progressions = sum(1 for r in reviews.data if r.get("progression")) if reviews.data else 8
+        total_p = len(partners.data) if partners.data else 0
+        total_pl = len(placements.data) if placements.data else 0
+        active = len([p for p in placements.data if p.get("status") == "Active"]) if placements.data else 0
+        retention = round((active / total_pl) * 100) if total_pl > 0 else 0
+        progs = len([r for r in reviews.data if r.get("progression")]) if reviews.data else 0
         
-    except:
-        total_partners, total_placements, active, retention, progressions = 6, 20, 18, 90, 8
-    
-    # Key metrics
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(f'''
-        <div class="stat-card">
-            <div class="stat-value">{total_partners}</div>
-            <div class="stat-label">Employment Partners</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    with col2:
-        st.markdown(f'''
-        <div class="stat-card">
-            <div class="stat-value">{active}</div>
-            <div class="stat-label">Active Placements</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    with col3:
-        st.markdown(f'''
-        <div class="stat-card">
-            <div class="stat-value">{retention}%</div>
-            <div class="stat-label">Overall Retention</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    with col4:
-        st.markdown(f'''
-        <div class="stat-card">
-            <div class="stat-value">{progressions}</div>
-            <div class="stat-label">Career Progressions</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    
-    st.markdown("")
-    
-    # Partner Performance
-    st.markdown('<p class="section-header">Partner Performance</p>', unsafe_allow_html=True)
-    
-    partner_data = [
-        {"name": "DoubleTree by Hilton", "placements": 5, "active": 5, "business": 78, "social": 82, "tier": "Leading"},
-        {"name": "Radisson Blu", "placements": 4, "active": 4, "business": 74, "social": 79, "tier": "Established"},
-        {"name": "Starbucks", "placements": 3, "active": 3, "business": 71, "social": 76, "tier": "Established"},
-        {"name": "First Bus", "placements": 3, "active": 3, "business": 82, "social": 85, "tier": "Leading"},
-        {"name": "Pret A Manger", "placements": 2, "active": 2, "business": 68, "social": 72, "tier": "Established"},
-        {"name": "Bristol Waste", "placements": 3, "active": 3, "business": 76, "social": 80, "tier": "Established"},
-    ]
-    
-    for p in partner_data:
-        tier_badge = "badge-success" if p["tier"] == "Leading" else "badge-info"
-        st.markdown(f'''
-        <div class="partner-row">
-            <div>
-                <div class="partner-name">{p["name"]}</div>
-                <div class="partner-meta">{p["active"]}/{p["placements"]} active placements</div>
-            </div>
-            <div style="display: flex; gap: 16px; align-items: center;">
-                <div style="text-align: center;"><div style="font-size: 1.2rem; font-weight: 700;">{p["business"]}</div><div style="font-size: 0.7rem; color: #64748b;">Business</div></div>
-                <div style="text-align: center;"><div style="font-size: 1.2rem; font-weight: 700;">{p["social"]}</div><div style="font-size: 0.7rem; color: #64748b;">Social</div></div>
-                <span class="badge {tier_badge}">{p["tier"]}</span>
-            </div>
-        </div>
-        ''', unsafe_allow_html=True)
-    
-    # Alerts
-    st.markdown('<p class="section-header">Alerts & Actions</p>', unsafe_allow_html=True)
-    st.markdown('<div class="alert-card">3 milestone reviews overdue (DoubleTree: 2, Radisson: 1)</div>', unsafe_allow_html=True)
-    st.markdown('<div class="alert-card">2 candidates approaching 6-month milestone this week</div>', unsafe_allow_html=True)
-
-def ach_training_overview():
-    # Aggregate stats
-    total_partners = 3
-    total_trained = 87
-    sessions = 7
-    avg_improvement = 42
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(f'''
-        <div class="stat-card">
-            <div class="stat-value">{total_partners}</div>
-            <div class="stat-label">Training Partners</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    with col2:
-        st.markdown(f'''
-        <div class="stat-card">
-            <div class="stat-value">{total_trained}</div>
-            <div class="stat-label">Staff Trained</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    with col3:
-        st.markdown(f'''
-        <div class="stat-card">
-            <div class="stat-value">{sessions}</div>
-            <div class="stat-label">Sessions Delivered</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    with col4:
-        st.markdown(f'''
-        <div class="stat-card">
-            <div class="stat-value">+{avg_improvement}%</div>
-            <div class="stat-label">Avg Improvement</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    
-    st.markdown("")
-    
-    # Partner Performance
-    st.markdown('<p class="section-header">Partner Performance</p>', unsafe_allow_html=True)
-    
-    training_partners = [
-        {"name": "NHS Bristol Trust", "trained": 45, "sessions": 3, "score": 75, "infra": 69, "tier": "Established"},
-        {"name": "Bristol City Council", "trained": 28, "sessions": 2, "score": 68, "infra": 44, "tier": "Developing"},
-        {"name": "University of Bristol", "trained": 14, "sessions": 2, "score": 82, "infra": 75, "tier": "Leading"},
-    ]
-    
-    for p in training_partners:
-        tier_badge = "badge-success" if p["tier"] == "Leading" else ("badge-info" if p["tier"] == "Established" else "badge-warning")
-        st.markdown(f'''
-        <div class="partner-row">
-            <div>
-                <div class="partner-name">{p["name"]}</div>
-                <div class="partner-meta">{p["trained"]} staff across {p["sessions"]} sessions</div>
-            </div>
-            <div style="display: flex; gap: 16px; align-items: center;">
-                <div style="text-align: center;"><div style="font-size: 1.2rem; font-weight: 700;">{p["score"]}</div><div style="font-size: 0.7rem; color: #64748b;">Capability</div></div>
-                <div style="text-align: center;"><div style="font-size: 1.2rem; font-weight: 700;">{p["infra"]}</div><div style="font-size: 0.7rem; color: #64748b;">Infrastructure</div></div>
-                <span class="badge {tier_badge}">{p["tier"]}</span>
-            </div>
-        </div>
-        ''', unsafe_allow_html=True)
-    
-    # Alerts
-    st.markdown('<p class="section-header">Alerts & Actions</p>', unsafe_allow_html=True)
-    st.markdown('<div class="alert-card">Bristol City Council: 3-month follow-up overdue for March cohort</div>', unsafe_allow_html=True)
-    st.markdown('<div class="info-card">University of Bristol requesting additional session for Academic Staff</div>', unsafe_allow_html=True)
-
-def ach_combined_impact():
-    st.markdown("### Combined Programme Impact")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f'''
-        <div class="score-card">
-            <div class="score-label">Employment Programme</div>
-            <div class="score-value">76</div>
-            <div class="score-subtitle">Average Partner Score</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    with col2:
-        st.markdown(f'''
-        <div class="score-card">
-            <div class="score-label">Training Programme</div>
-            <div class="score-value">72</div>
-            <div class="score-subtitle">Average Partner Score</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    
-    st.markdown("")
-    st.markdown('<p class="section-header">Impact Summary</p>', unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Partners", "9", "Employment: 6, Training: 3")
-    with col2:
-        st.metric("Lives Impacted", "107", "20 employed + 87 trained")
-    with col3:
-        st.metric("Business Value Generated", "£52,400", "Across all employment partners")
-    
-    st.markdown('<p class="section-header">For Funder Reports</p>', unsafe_allow_html=True)
-    st.markdown("""
-    **Employment Programme:**
-    - 20 refugees/migrants placed into employment
-    - 90% retention rate (vs 52% sector baseline)
-    - 8 career progressions achieved
-    - £52,400 productivity value generated for partners
-    - Average Candidate Capability Growth Index: 80/100
-    
-    **Training Programme:**
-    - 87 staff trained across 3 organisations
-    - 42% average improvement in inclusion capability
-    - 78% applied learning in practice at 3 months
-    - 9 refugees hired by training partners post-training
-    """)
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.markdown(f'<div class="metric-container"><div class="metric-label">Partners</div><div class="metric-value">{total_p}</div></div>', unsafe_allow_html=True)
+        with col2:
+            st.markdown(f'<div class="metric-container"><div class="metric-label">Placements</div><div class="metric-value">{total_pl}</div><div class="metric-delta">{active} active</div></div>', unsafe_allow_html=True)
+        with col3:
+            st.markdown(f'<div class="metric-container"><div class="metric-label">Retention</div><div class="metric-value">{retention}%</div></div>', unsafe_allow_html=True)
+        with col4:
+            st.markdown(f'<div class="metric-container"><div class="metric-label">Progressions</div><div class="metric-value">{progs}</div></div>', unsafe_allow_html=True)
+        
+        st.markdown('<p class="section-header">Partner Performance</p>', unsafe_allow_html=True)
+        for partner in (partners.data or []):
+            pp = [p for p in (placements.data or []) if p.get("partner_id") == partner["id"]]
+            pa = len([p for p in pp if p.get("status") == "Active"])
+            pr = round((pa / len(pp)) * 100) if pp else 0
+            with st.expander(f"**{partner['name']}** — {len(pp)} placements, {pr}% retention"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**Sector:** {partner.get('sector')}")
+                    st.write(f"**Contact:** {partner.get('contact_name')}")
+                    st.write(f"**Email:** {partner.get('contact_email')}")
+                with col2:
+                    st.write(f"**Employees:** {partner.get('employee_count')}")
+                    st.write(f"**Tier:** {partner.get('subscription_tier')}")
+                    st.write(f"**Since:** {partner.get('created_at', 'N/A')[:10]}")
+        
+        st.markdown('<p class="section-header">Recent Placements</p>', unsafe_allow_html=True)
+        recent = sorted(placements.data or [], key=lambda x: x.get("start_date", ""), reverse=True)[:8]
+        for p in recent:
+            st.write(f"{'✅' if p.get('status')=='Active' else '⚪'} **{p['candidate_name']}** — {p['role']} at {p['partner_name']} ({p.get('start_date', 'N/A')})")
+    except Exception as e:
+        st.error(f"Error: {e}")
 
 # ============ ACH CANDIDATE SUPPORT ============
-def ach_candidate_checkins():
-    st.markdown('<p class="main-header">Candidate Check-ins</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">7-Domain Capability Assessment</p>', unsafe_allow_html=True)
+def ach_candidate_support():
+    st.markdown('<p class="main-header">👥 Candidate Support</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Record candidate check-ins and wellbeing data</p>', unsafe_allow_html=True)
     
-    # Get active placements
-    try:
-        placements = supabase.table("placements").select("*").eq("status", "Active").execute()
-        placement_list = placements.data if placements.data else []
-    except:
-        placement_list = []
-    
-    if not placement_list:
-        st.info("No active placements found")
-        return
-    
-    # Pending check-ins
-    st.markdown('<p class="section-header">Pending Check-ins</p>', unsafe_allow_html=True)
-    
-    pending = []
-    for p in placement_list:
-        if p.get("start_date"):
-            months = (datetime.now() - datetime.fromisoformat(p["start_date"])).days / 30
-            for milestone in [3, 6, 12]:
-                if months >= milestone - 0.5:  # Due within 2 weeks of milestone
-                    pending.append({"placement": p, "milestone": milestone, "months": months})
-    
-    if pending:
-        for item in pending[:5]:
-            p = item["placement"]
-            st.markdown(f'<div class="alert-card"><strong>{p["candidate_name"]}</strong> at {p["partner_name"]} — {item["milestone"]}-month check-in due</div>', unsafe_allow_html=True)
-    
-    # Check-in form
-    st.markdown('<p class="section-header">Submit Check-in</p>', unsafe_allow_html=True)
-    
-    selected = st.selectbox("Select Candidate", [f"{p['candidate_name']} at {p['partner_name']}" for p in placement_list])
-    placement = next((p for p in placement_list if f"{p['candidate_name']} at {p['partner_name']}" == selected), None)
-    
-    if placement:
-        with st.form("candidate_checkin"):
-            milestone = st.selectbox("Milestone", [3, 6, 12])
-            
-            st.markdown("---")
-            st.markdown("### Self-Efficacy (Confidence)")
-            se1 = st.select_slider("My confidence in my abilities has grown since starting this job", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="se1")
-            se2 = st.select_slider("I feel capable of taking on new challenges at work", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="se2")
-            se3 = st.select_slider("I believe I can progress in my career", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="se3")
-            
-            st.markdown("### Work Readiness (Skills)")
-            wr1 = st.select_slider("I have received training that helps me do my job better", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="wr1")
-            wr2 = st.select_slider("My English/communication skills have improved", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="wr2")
-            wr3 = st.select_slider("I am developing new skills in this role", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="wr3")
-            
-            st.markdown("### Social Capital (Belonging)")
-            sc1 = st.select_slider("I feel part of the team", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="sc1")
-            sc2 = st.select_slider("I have colleagues I can ask for help", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="sc2")
-            sc3 = st.select_slider("I feel included in workplace social activities", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="sc3")
-            
-            st.markdown("### Wellbeing (Psychological Safety)")
-            wb1 = st.select_slider("I feel safe to be myself at work", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="wb1")
-            wb2 = st.select_slider("I feel respected by my manager and colleagues", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="wb2")
-            wb3 = st.select_slider("I can raise concerns without fear of negative consequences", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="wb3")
-            wb4 = st.select_slider("My mental health has improved since starting this job", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="wb4")
-            
-            st.markdown("### Economic Stability")
-            es1 = st.select_slider("My income is stable and predictable", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="es1")
-            es2 = st.select_slider("I can meet my basic needs with my current salary", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="es2")
-            es3 = st.select_slider("I feel more financially secure than before this job", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="es3")
-            
-            st.markdown("### Progression")
-            pr1 = st.select_slider("I have a clear understanding of how I can progress", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="pr1")
-            pr2 = st.select_slider("My employer supports my development", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="pr2")
-            pr3 = st.select_slider("I have had opportunities for training or learning", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="pr3")
-            
-            st.markdown("### Voice")
-            best_thing = st.text_area("What has been the best thing about this job?")
-            challenges = st.text_area("What challenges have you faced?")
-            support_needed = st.text_area("What would help you succeed even more?")
-            
-            st.markdown("### Overall")
-            overall = st.select_slider("How do you feel about your job overall?", options=[1,2,3,4,5], value=4, format_func=lambda x: ["Very Negative", "Negative", "Neutral", "Positive", "Very Positive"][x-1], key="overall")
-            
-            if st.form_submit_button("Submit Check-in", use_container_width=True):
-                # Calculate domain scores (convert to 0-100)
-                self_efficacy_score = round(convert_to_100((se1 + se2 + se3) / 3))
-                work_readiness_score = round(convert_to_100((wr1 + wr2 + wr3) / 3))
-                social_capital_score = round(convert_to_100((sc1 + sc2 + sc3) / 3))
-                wellbeing_score = round(convert_to_100((wb1 + wb2 + wb3 + wb4) / 4))
-                economic_stability_score = round(convert_to_100((es1 + es2 + es3) / 3))
-                progression_score = round(convert_to_100((pr1 + pr2 + pr3) / 3))
-                
-                try:
-                    supabase.table("candidate_checkins").insert({
-                        "placement_id": placement["id"],
-                        "partner_id": placement["partner_id"],
-                        "milestone_month": milestone,
-                        "self_efficacy_score": self_efficacy_score,
-                        "work_readiness_score": work_readiness_score,
-                        "social_capital_score": social_capital_score,
-                        "wellbeing_score": wellbeing_score,
-                        "economic_stability_score": economic_stability_score,
-                        "progression_score": progression_score,
-                        "overall_feeling": overall,
-                        "best_thing": best_thing,
-                        "challenges": challenges,
-                        "support_needed": support_needed,
-                        "submitted_at": datetime.now().isoformat()
-                    }).execute()
-                    
-                    # Also update milestone_reviews_candidate for compatibility
-                    supabase.table("milestone_reviews_candidate").insert({
-                        "placement_id": placement["id"],
-                        "milestone_month": milestone,
-                        "current_psych_safety": round((wb1 + wb2 + wb3 + wb4) / 4),
-                        "improvement_quote": best_thing,
-                        "submitted_at": datetime.now().isoformat()
-                    }).execute()
-                    
-                    st.success("Check-in submitted successfully")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-def ach_partner_management():
-    st.markdown('<p class="main-header">Partner Management</p>', unsafe_allow_html=True)
-    
-    tab1, tab2 = st.tabs(["Employment Partners", "Training Partners"])
+    tab1, tab2 = st.tabs(["Pending Check-ins", "Submit Check-in"])
     
     with tab1:
-        st.markdown('<p class="section-header">Employment Partners</p>', unsafe_allow_html=True)
-        
-        partners = [
-            {"id": 1, "name": "DoubleTree by Hilton", "sector": "Hospitality", "placements": 5, "score": 80},
-            {"id": 2, "name": "Radisson Blu", "sector": "Hospitality", "placements": 4, "score": 76},
-            {"id": 3, "name": "Starbucks", "sector": "Food & Beverage", "placements": 3, "score": 73},
-            {"id": 4, "name": "First Bus", "sector": "Transport", "placements": 3, "score": 83},
-            {"id": 5, "name": "Pret A Manger", "sector": "Food & Beverage", "placements": 2, "score": 70},
-            {"id": 6, "name": "Bristol Waste", "sector": "Environmental", "placements": 3, "score": 78},
-        ]
-        
-        for p in partners:
-            level, _, _ = get_benchmark_level(p["score"])
-            with st.expander(f"**{p['name']}** — {p['sector']} · {p['placements']} placements · Score: {p['score']}"):
-                st.write(f"Performance Tier: **{level}**")
-                st.write(f"Login: `{p['name'].lower().replace(' ', '').replace('by', '')[:10]}` / `partner123`")
-                if st.button(f"View Full Dashboard", key=f"view_{p['id']}"):
-                    st.info("In production, this would open the partner's dashboard view")
+        try:
+            placements = supabase.table("placements").select("*").eq("status", "Active").execute()
+            if placements.data:
+                pending = []
+                for p in placements.data:
+                    if p.get("start_date"):
+                        months = (datetime.now() - datetime.fromisoformat(p["start_date"])).days / 30
+                        for m in [3, 6, 12]:
+                            if months >= m:
+                                rev = supabase.table("milestone_reviews_candidate").select("id").eq("placement_id", p["id"]).eq("milestone_month", m).execute()
+                                if not rev.data:
+                                    pending.append({"placement": p, "milestone": m})
+                
+                if pending:
+                    st.warning(f"{len(pending)} candidate check-in(s) due")
+                    for item in pending[:10]:
+                        p = item["placement"]
+                        st.write(f"⏰ **{p['candidate_name']}** at {p['partner_name']} — {item['milestone']}-month check-in due")
+                else:
+                    st.success("✓ All candidate check-ins are up to date!")
+            else:
+                st.info("No active placements")
+        except Exception as e:
+            st.error(f"Error: {e}")
     
     with tab2:
-        st.markdown('<p class="section-header">Training Partners</p>', unsafe_allow_html=True)
+        st.markdown('<div class="info-card">Candidate check-ins capture wellbeing, psychological safety, and career development data directly from employees.</div>', unsafe_allow_html=True)
         
-        partners = [
-            {"id": 101, "name": "NHS Bristol Trust", "trained": 45, "score": 75},
-            {"id": 102, "name": "Bristol City Council", "trained": 28, "score": 68},
-            {"id": 103, "name": "University of Bristol", "trained": 14, "score": 82},
-        ]
-        
-        for p in partners:
-            level, _, _ = get_benchmark_level(p["score"])
-            with st.expander(f"**{p['name']}** · {p['trained']} trained · Score: {p['score']}"):
-                st.write(f"Performance Tier: **{level}**")
+        try:
+            placements = supabase.table("placements").select("*").eq("status", "Active").execute()
+            if placements.data:
+                placement_options = {f"{p['candidate_name']} at {p['partner_name']}": p for p in placements.data}
+                selected = st.selectbox("Select Candidate", options=list(placement_options.keys()))
+                placement = placement_options[selected]
+                
+                months_employed = (datetime.now() - datetime.fromisoformat(placement["start_date"])).days / 30
+                milestone = st.selectbox("Milestone", [3, 6, 12])
+                
+                if months_employed < milestone:
+                    st.warning(f"This candidate has only been employed {months_employed:.1f} months. {milestone}-month check-in not yet due.")
+                else:
+                    with st.form("candidate_checkin"):
+                        st.markdown("##### Psychological Safety")
+                        safe_self = st.select_slider("I feel safe to be myself at work", ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"], value="Agree")
+                        respected = st.select_slider("I feel respected by my colleagues and managers", ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"], value="Agree")
+                        welcoming = st.select_slider("My workplace is welcoming and inclusive", ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"], value="Agree")
+                        
+                        st.markdown("##### Economic Wellbeing")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            hourly = st.number_input("Current hourly rate (£)", min_value=8.0, max_value=30.0, value=float(placement.get("hourly_rate", 12.0)), step=0.25)
+                            contract = st.selectbox("Contract type", ["Permanent", "Fixed-term", "Zero-hours", "Variable"])
+                        with col2:
+                            hours = st.number_input("Weekly hours", min_value=0, max_value=60, value=37)
+                            enough_hours = st.selectbox("Are you getting enough hours?", ["Yes", "No - I want more", "No - I want fewer"])
+                        
+                        st.markdown("##### Development")
+                        training = st.selectbox("Have you received any training?", ["Yes", "No"])
+                        training_type = st.text_input("If yes, what training?", placeholder="e.g. Manual handling, Food safety") if training == "Yes" else None
+                        confidence = st.select_slider("My confidence has grown since starting", ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"], value="Agree")
+                        
+                        st.markdown("##### Overall Wellbeing")
+                        overall = st.select_slider("Overall, how do you feel about your job?", ["Very Negative", "Negative", "Neutral", "Positive", "Very Positive"], value="Positive")
+                        quote = st.text_area("Is there anything you would like to share about your experience?", placeholder="e.g. This job has changed my life. I wake up excited to go to work...")
+                        
+                        st.markdown("##### Capability Assessment")
+                        st.caption("Rate current capability (1-5)")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            efficacy = st.slider("Self-efficacy (confidence in abilities)", 1, 5, 4)
+                            readiness = st.slider("Work readiness", 1, 5, 4)
+                            language = st.slider("Language confidence", 1, 5, 4)
+                        with col2:
+                            digital = st.slider("Digital skills", 1, 5, 4)
+                            psych = st.slider("Psychological safety", 1, 5, 4)
+                        
+                        if st.form_submit_button("Submit Check-in", use_container_width=True):
+                            try:
+                                data = {
+                                    "placement_id": placement["id"],
+                                    "milestone_month": milestone,
+                                    "safe_to_be_self": safe_self,
+                                    "feel_respected": respected,
+                                    "workplace_welcoming": welcoming,
+                                    "hourly_rate": hourly,
+                                    "contract_type": contract,
+                                    "weekly_hours": hours,
+                                    "enough_hours": enough_hours,
+                                    "received_training": training == "Yes",
+                                    "training_type": training_type,
+                                    "confidence_growth": confidence,
+                                    "overall_feeling": overall,
+                                    "improvement_quote": quote,
+                                    "current_self_efficacy": efficacy,
+                                    "current_work_readiness": readiness,
+                                    "current_language": language,
+                                    "current_digital": digital,
+                                    "current_psych_safety": psych,
+                                    "submitted_at": datetime.now().isoformat()
+                                }
+                                supabase.table("milestone_reviews_candidate").insert(data).execute()
+                                st.success("✓ Check-in submitted!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error: {e}")
+        except Exception as e:
+            st.error(f"Error loading placements: {e}")
 
-def ach_reports():
-    st.markdown('<p class="main-header">Reports & Export</p>', unsafe_allow_html=True)
+# ============ ACH PARTNERS ============
+def ach_partners():
+    st.markdown('<p class="main-header">🏢 Partner Organisations</p>', unsafe_allow_html=True)
     
-    st.markdown('<p class="section-header">Generate Reports</p>', unsafe_allow_html=True)
-    
-    report_type = st.selectbox("Report Type", [
-        "Partner Impact Report",
-        "Programme Summary (Employment)",
-        "Programme Summary (Training)",
-        "Funder Report",
-        "Data Export"
-    ])
-    
-    if report_type == "Partner Impact Report":
-        partner = st.selectbox("Select Partner", [
-            "DoubleTree by Hilton", "Radisson Blu", "Starbucks", 
-            "First Bus", "Pret A Manger", "Bristol Waste",
-            "NHS Bristol Trust", "Bristol City Council", "University of Bristol"
-        ])
-        period = st.selectbox("Period", ["Q4 2024", "Q3 2024", "Full Year 2024"])
-    
-    if st.button("Generate Report", use_container_width=True):
-        st.success("Report generated. Download will begin shortly.")
-        st.markdown("""
-        **Report Preview:**
-        
-        This would generate a PDF/DOCX report containing:
-        - Executive summary
-        - Key metrics and scores
-        - Trend analysis
-        - Candidate/staff outcomes
-        - Recommendations
-        """)
+    try:
+        data = supabase.table("impact_partners").select("*").execute()
+        for p in (data.data or []):
+            with st.expander(f"**{p['name']}** — {p.get('sector', 'N/A')}"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**Contact:** {p.get('contact_name')}")
+                    st.write(f"**Email:** {p.get('contact_email')}")
+                    st.write(f"**Phone:** {p.get('contact_phone')}")
+                with col2:
+                    st.write(f"**Employees:** {p.get('employee_count')}")
+                    st.write(f"**Tier:** {p.get('subscription_tier')}")
+                    st.write(f"**Since:** {p.get('created_at', '')[:10] if p.get('created_at') else 'N/A'}")
+    except Exception as e:
+        st.error(f"Error: {e}")
 
 # ============ NAVIGATION ============
 def main():
@@ -1488,400 +755,28 @@ def main():
         return
     
     with st.sidebar:
-        st.markdown("### Impact Intelligence")
+        st.markdown("### 🌍 Impact Intelligence")
         st.markdown(f"**{st.session_state.user_name}**")
         st.markdown("---")
         
-        # View toggle for ACH staff
         if st.session_state.user_type == "ach_staff":
-            st.markdown("**View as:**")
-            view_mode = st.selectbox("", [
-                "ACH Admin",
-                "───── Employment Partners ─────",
-                "DoubleTree by Hilton",
-                "Radisson Blu",
-                "Starbucks",
-                "First Bus",
-                "Pret A Manger",
-                "Bristol Waste",
-                "───── Training Partners ─────",
-                "NHS Bristol Trust",
-                "Bristol City Council",
-                "University of Bristol"
-            ], label_visibility="collapsed")
-            
-            st.markdown("---")
-            
-            # Determine which view to show
-            employment_partners = {
-                "DoubleTree by Hilton": 1,
-                "Radisson Blu": 2,
-                "Starbucks": 3,
-                "First Bus": 4,
-                "Pret A Manger": 5,
-                "Bristol Waste": 6
-            }
-            
-            training_partners = {
-                "NHS Bristol Trust": 101,
-                "Bristol City Council": 102,
-                "University of Bristol": 103
-            }
-            
-            if view_mode == "ACH Admin":
-                page = st.radio("", ["Dashboard", "Candidate Check-ins", "Partner Management", "Reports"], label_visibility="collapsed")
-                st.markdown("---")
-                if st.button("Logout", use_container_width=True):
-                    for k in st.session_state:
-                        st.session_state[k] = False if k == "logged_in" else None
-                    st.rerun()
-                {"Dashboard": ach_dashboard, "Candidate Check-ins": ach_candidate_checkins, "Partner Management": ach_partner_management, "Reports": ach_reports}[page]()
-            
-            elif view_mode in employment_partners:
-                st.session_state.viewing_partner_id = employment_partners[view_mode]
-                st.session_state.viewing_partner_name = view_mode
-                st.caption(f"Viewing as: {view_mode}")
-                page = st.radio("", ["Dashboard", "Baseline Data", "Interview Feedback", "Milestone Reviews"], label_visibility="collapsed")
-                st.markdown("---")
-                if st.button("Logout", use_container_width=True):
-                    for k in st.session_state:
-                        st.session_state[k] = False if k == "logged_in" else None
-                    st.rerun()
-                {"Dashboard": lambda: employment_dashboard_view(employment_partners[view_mode], view_mode), "Baseline Data": lambda: employment_baseline_view(employment_partners[view_mode]), "Interview Feedback": lambda: employment_interviews_view(employment_partners[view_mode]), "Milestone Reviews": lambda: employment_milestones_view(employment_partners[view_mode])}[page]()
-            
-            elif view_mode in training_partners:
-                st.session_state.viewing_partner_id = training_partners[view_mode]
-                st.session_state.viewing_partner_name = view_mode
-                st.caption(f"Viewing as: {view_mode}")
-                page = st.radio("", ["Dashboard", "Pre-Training Survey", "Post-Training Survey", "3-Month Follow-up", "Staff Feedback", "Infrastructure"], label_visibility="collapsed")
-                st.markdown("---")
-                if st.button("Logout", use_container_width=True):
-                    for k in st.session_state:
-                        st.session_state[k] = False if k == "logged_in" else None
-                    st.rerun()
-                {"Dashboard": lambda: training_dashboard_view(training_partners[view_mode], view_mode), "Pre-Training Survey": lambda: training_pre_survey_view(training_partners[view_mode]), "Post-Training Survey": lambda: training_post_survey_view(training_partners[view_mode]), "3-Month Follow-up": lambda: training_followup_view(training_partners[view_mode]), "Staff Feedback": lambda: training_staff_feedback_view(training_partners[view_mode]), "Infrastructure": lambda: training_infrastructure_view(training_partners[view_mode])}[page]()
-            
-            else:
-                # Separator selected, show admin view
-                page = st.radio("", ["Dashboard", "Candidate Check-ins", "Partner Management", "Reports"], label_visibility="collapsed")
-                st.markdown("---")
-                if st.button("Logout", use_container_width=True):
-                    for k in st.session_state:
-                        st.session_state[k] = False if k == "logged_in" else None
-                    st.rerun()
-                {"Dashboard": ach_dashboard, "Candidate Check-ins": ach_candidate_checkins, "Partner Management": ach_partner_management, "Reports": ach_reports}[page]()
+            page = st.radio("Navigation", ["Dashboard", "Partners", "Candidate Support"], label_visibility="collapsed")
+        else:
+            page = st.radio("Navigation", ["Dashboard", "Baseline Data", "Interview Feedback", "Milestone Reviews", "Impact Report"], label_visibility="collapsed")
         
-        else:
-            # Non-ACH staff (direct partner login - kept for backwards compatibility)
-            if st.session_state.partner_type:
-                st.caption(st.session_state.partner_type.title())
-            st.markdown("---")
-            
-            if st.session_state.partner_type == "employment":
-                page = st.radio("", ["Dashboard", "Baseline Data", "Interview Feedback", "Milestone Reviews"], label_visibility="collapsed")
-            elif st.session_state.partner_type == "training":
-                page = st.radio("", ["Dashboard", "Pre-Training Survey", "Post-Training Survey", "3-Month Follow-up", "Staff Feedback", "Infrastructure"], label_visibility="collapsed")
-            
-            st.markdown("---")
-            if st.button("Logout", use_container_width=True):
-                for k in st.session_state:
-                    st.session_state[k] = False if k == "logged_in" else None
-                st.rerun()
-            
-            if st.session_state.partner_type == "employment":
-                {"Dashboard": employment_dashboard, "Baseline Data": employment_baseline, "Interview Feedback": employment_interviews, "Milestone Reviews": employment_milestones}[page]()
-            elif st.session_state.partner_type == "training":
-                {"Dashboard": training_dashboard, "Pre-Training Survey": training_pre_survey, "Post-Training Survey": training_post_survey, "3-Month Follow-up": training_followup, "Staff Feedback": training_staff_feedback, "Infrastructure": training_infrastructure}[page]()
-
-# View functions that accept partner_id
-def employment_dashboard_view(partner_id, partner_name):
-    st.markdown(f'<p class="main-header">{partner_name}</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Employment Partnership Dashboard</p>', unsafe_allow_html=True)
+        st.markdown("---")
+        if st.button("Logout", use_container_width=True):
+            for k in ["logged_in", "user_type", "user_id", "user_name"]:
+                st.session_state[k] = None if k != "logged_in" else False
+            st.rerun()
+        
+        st.markdown("---")
+        st.caption("Powered by ACH")
     
-    m = calculate_employment_metrics(partner_id)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(render_score_card("Business Value Score", m["business_score"], "Productivity & retention gains"), unsafe_allow_html=True)
-        st.caption(f"ACH Partner Average: 68")
-    with col2:
-        st.markdown(render_score_card("Social Impact Score", m["social_score"], "Candidate outcomes & progression"), unsafe_allow_html=True)
-        st.caption(f"ACH Partner Average: 72")
-    
-    st.markdown("")
-    st.markdown('<p class="section-header">Business Value</p>', unsafe_allow_html=True)
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(f'<div class="metric-card"><div class="metric-label">Hard-to-Fill Roles Filled</div><div class="metric-value">{m["hard_roles"]}</div><div class="metric-detail">roles secured through ACH</div></div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown(f'<div class="metric-card"><div class="metric-label">Productivity Gained</div><div class="metric-value">£{m["productivity_gained"]:,}</div><div class="metric-detail">from faster vacancy fill (~{m["avg_vacancy_weeks_saved"]} wks saved)</div></div>', unsafe_allow_html=True)
-    with col3:
-        improvement = m["retention"] - m["baseline_retention"]
-        st.markdown(f'<div class="metric-card"><div class="metric-label">Retention Rate</div><div class="metric-value">{m["retention"]}%</div><div class="metric-detail">+{improvement}% vs baseline ({m["baseline_retention"]}%)</div></div>', unsafe_allow_html=True)
-    with col4:
-        retention_value = m.get("retention_value", round(improvement * 450 * m["total"] / 10))
-        st.markdown(f'<div class="metric-card"><div class="metric-label">Retention Savings</div><div class="metric-value">£{retention_value:,}</div><div class="metric-detail">from reduced turnover costs</div></div>', unsafe_allow_html=True)
-    
-    st.markdown('<p class="section-header">Social Impact</p>', unsafe_allow_html=True)
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        st.markdown("**Candidate Capability Growth Index**")
-        domains = m.get("capability_domains", {})
-        for key, domain in domains.items():
-            st.markdown(f'<div class="domain-score"><div class="domain-label">{domain["label"]}</div><div class="domain-bar"><div class="domain-fill" style="width: {domain["score"]}%; background: {domain["color"]};"></div></div><div class="domain-value">{domain["score"]}</div></div>', unsafe_allow_html=True)
-        st.markdown(f"**Composite Index: {m.get('capability_index', 80)}**/100")
-    with col2:
-        st.markdown(f'<div class="metric-card" style="margin-bottom: 12px;"><div class="metric-label">Talents from Refugee/Migrant Backgrounds</div><div class="metric-value">{m["active"]}</div><div class="metric-detail">{m["total"]} total placements</div></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="metric-card" style="margin-bottom: 12px;"><div class="metric-label">Progression Support Score</div><div class="metric-value">{m["progression_support_score"]}</div><div class="metric-detail">{m["training_provided"]} training actions, {m["progressions"]} progressions</div></div>', unsafe_allow_html=True)
-        badge_class = "badge-success" if m["living_wage_employer"] else "badge-warning"
-        badge_text = "Living Wage Employer" if m["living_wage_employer"] else "Not Living Wage Accredited"
-        st.markdown(f'<div class="metric-card"><div class="metric-label">Living Wage Status</div><div style="margin-top: 8px;"><span class="badge {badge_class}">{badge_text}</span></div></div>', unsafe_allow_html=True)
-    
-    if m["candidate_quotes"]:
-        st.markdown('<p class="section-header">Candidate Voices</p>', unsafe_allow_html=True)
-        for quote, name, source in m["candidate_quotes"][:3]:
-            st.markdown(f'<div class="quote-card candidate"><div class="quote-text">"{quote}"</div><div class="quote-source">— {name} (from {source})</div></div>', unsafe_allow_html=True)
-    
-    st.markdown('<p class="section-header">Your Team</p>', unsafe_allow_html=True)
-    if m["placements"]:
-        for p in m["placements"]:
-            status_badge = "badge-success" if p.get("status") == "Active" else "badge-info"
-            st.markdown(f"**{p['candidate_name']}** — {p['role']} · <span class='badge {status_badge}'>{p.get('status', 'Active')}</span>", unsafe_allow_html=True)
+    if st.session_state.user_type == "ach_staff":
+        {"Dashboard": ach_dashboard, "Partners": ach_partners, "Candidate Support": ach_candidate_support}[page]()
     else:
-        st.info("No placements yet.")
-
-def employment_baseline_view(partner_id):
-    st.markdown('<p class="main-header">Baseline Data</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Role information for measuring impact</p>', unsafe_allow_html=True)
-    
-    try:
-        existing = supabase.table("partner_baseline").select("*").eq("partner_id", partner_id).execute()
-        if existing.data:
-            st.markdown(f"**{len(existing.data)} roles configured**")
-            for r in existing.data:
-                diff_badge = "badge-danger" if r.get("difficulty") in ["Hard", "Very Hard"] else "badge-info"
-                with st.expander(f"{r['role_title']} — £{r.get('salary', 0):,}/year"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write(f"Typical retention: {r.get('retention_rate')}%")
-                        st.write(f"Vacancy duration: {r.get('vacancy_time')}")
-                    with col2:
-                        st.markdown(f"Difficulty: <span class='badge {diff_badge}'>{r.get('difficulty')}</span>", unsafe_allow_html=True)
-    except:
-        pass
-    
-    st.markdown('<p class="section-header">Add Role</p>', unsafe_allow_html=True)
-    with st.form("baseline_view"):
-        col1, col2 = st.columns(2)
-        with col1:
-            role = st.text_input("Role Title *")
-            salary = st.number_input("Annual Salary (£)", min_value=18000, max_value=80000, value=24000, step=500)
-            retention = st.slider("Typical 12-month retention %", 0, 100, 55)
-        with col2:
-            difficulty = st.selectbox("Difficulty to fill", ["Easy", "Moderate", "Hard", "Very Hard"])
-            vacancy_time = st.selectbox("Typical vacancy duration", ["< 2 weeks", "2-4 weeks", "1-2 months", "2-3 months", "3+ months"])
-        if st.form_submit_button("Save Role", use_container_width=True):
-            if role:
-                supabase.table("partner_baseline").insert({"partner_id": partner_id, "role_title": role, "salary": salary, "retention_rate": retention, "difficulty": difficulty, "vacancy_time": vacancy_time, "living_wage": True, "permanent": "Yes", "created_at": datetime.now().isoformat()}).execute()
-                st.success("Role saved")
-                st.rerun()
-
-def employment_interviews_view(partner_id):
-    st.markdown('<p class="main-header">Interview Feedback</p>', unsafe_allow_html=True)
-    with st.form("interview_view"):
-        col1, col2 = st.columns(2)
-        with col1:
-            name = st.text_input("Candidate Name *")
-            role = st.text_input("Role *")
-            date = st.date_input("Interview Date", value=datetime.now())
-        with col2:
-            hired = st.selectbox("Outcome", ["Hired", "Not Hired"])
-        if hired == "Hired":
-            standout = st.text_area("What made this candidate stand out?")
-            start_date = st.date_input("Start Date", value=datetime.now() + timedelta(days=14))
-            salary = st.number_input("Salary (£)", min_value=18000, max_value=80000, value=24000)
-            rejection_reason = None
-        else:
-            rejection_reason = st.selectbox("Primary reason", ["Skills gap", "English proficiency", "Experience", "Availability", "Other"])
-            standout = start_date = salary = None
-        if st.form_submit_button("Submit", use_container_width=True):
-            if name and role:
-                supabase.table("interview_feedback").insert({"partner_id": partner_id, "candidate_name": name, "candidate_id": f"C{datetime.now().strftime('%H%M%S')}", "role": role, "interview_date": date.isoformat(), "hired": hired == "Hired", "standout_reason": standout, "rejection_reason": rejection_reason, "submitted_at": datetime.now().isoformat()}).execute()
-                if hired == "Hired" and start_date:
-                    supabase.table("placements").insert({"partner_id": partner_id, "partner_name": st.session_state.get("viewing_partner_name", ""), "candidate_name": name, "candidate_id": f"C{datetime.now().strftime('%H%M%S')}", "role": role, "start_date": start_date.isoformat(), "salary": salary, "hourly_rate": round(salary/1950, 2), "contract_type": "Permanent", "status": "Active", "created_at": datetime.now().isoformat()}).execute()
-                st.success("Submitted")
-                st.rerun()
-
-def employment_milestones_view(partner_id):
-    st.markdown('<p class="main-header">Milestone Reviews</p>', unsafe_allow_html=True)
-    try:
-        placements = supabase.table("placements").select("*").eq("partner_id", partner_id).eq("status", "Active").execute()
-        if not placements.data:
-            st.info("No active placements")
-            return
-        pending = []
-        for p in placements.data:
-            if p.get("start_date"):
-                months = (datetime.now() - datetime.fromisoformat(p["start_date"])).days / 30
-                for milestone in [3, 6, 12]:
-                    if months >= milestone:
-                        rev = supabase.table("milestone_reviews_partner").select("id").eq("placement_id", p["id"]).eq("milestone_month", milestone).execute()
-                        if not rev.data:
-                            pending.append({"placement": p, "milestone": milestone})
-        if not pending:
-            st.success("All reviews complete")
-            return
-        st.markdown(f'<div class="alert-card">{len(pending)} review(s) pending</div>', unsafe_allow_html=True)
-        for item in pending:
-            p = item["placement"]
-            with st.expander(f"**{p['candidate_name']}** — {item['milestone']}-month review"):
-                with st.form(f"review_view_{p['id']}_{item['milestone']}"):
-                    employed = st.selectbox("Still employed?", ["Yes", "No"], key=f"ev_{p['id']}_{item['milestone']}")
-                    if employed == "Yes":
-                        performance = st.selectbox("Performance", ["Excellent", "Good", "Satisfactory", "Needs improvement"], key=f"pv_{p['id']}_{item['milestone']}")
-                        training = st.selectbox("Training provided?", ["Yes", "No"], key=f"tv_{p['id']}_{item['milestone']}")
-                        progression = st.selectbox("Progression support?", ["Yes", "No"], key=f"prv_{p['id']}_{item['milestone']}")
-                        quote = st.text_area("Observation about contribution", key=f"qv_{p['id']}_{item['milestone']}")
-                    else:
-                        performance = training = progression = quote = None
-                    if st.form_submit_button("Submit Review"):
-                        supabase.table("milestone_reviews_partner").insert({"placement_id": p['id'], "partner_id": partner_id, "milestone_month": item['milestone'], "still_employed": employed == "Yes", "performance": performance, "received_training": training == "Yes" if training else False, "progression": progression == "Yes" if progression else False, "contribution_quote": quote, "submitted_at": datetime.now().isoformat()}).execute()
-                        if employed == "No":
-                            supabase.table("placements").update({"status": "Left"}).eq("id", p['id']).execute()
-                        st.success("Review submitted")
-                        st.rerun()
-    except Exception as e:
-        st.error(f"Error: {e}")
-
-def training_dashboard_view(partner_id, partner_name):
-    st.markdown(f'<p class="main-header">{partner_name}</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Cultural Competence Training Impact</p>', unsafe_allow_html=True)
-    
-    pre_scores = {"Knowledge": 2.4, "Awareness": 2.6, "Confidence": 2.3, "Psych Safety": 3.0, "Refugee Employment": 2.2}
-    post_scores = {"Knowledge": 4.1, "Awareness": 4.0, "Confidence": 3.9, "Psych Safety": 4.2, "Refugee Employment": 3.8}
-    total_trained = 87
-    sessions_count = 3
-    
-    sections = {"Knowledge": {"weight": 0.15}, "Awareness": {"weight": 0.15}, "Confidence": {"weight": 0.20}, "Psych Safety": {"weight": 0.10}, "Refugee Employment": {"weight": 0.15}, "Infrastructure": {"weight": 0.25}}
-    staff_sections = ["Knowledge", "Awareness", "Confidence", "Psych Safety", "Refugee Employment"]
-    staff_composite = sum(convert_to_100(post_scores[s]) * sections[s]["weight"] for s in staff_sections)
-    infra_score = 75
-    inclusion_capability_score = round(staff_composite + (infra_score * sections["Infrastructure"]["weight"]))
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown(render_score_card("Inclusion Capability Score", inclusion_capability_score, "Staff capability + organisational infrastructure"), unsafe_allow_html=True)
-        st.caption(f"ACH Training Cohort Average: 68")
-    
-    st.markdown("")
-    st.markdown(f'<div class="info-card">Based on <strong>{total_trained} staff trained</strong> across <strong>{sessions_count} sessions</strong></div>', unsafe_allow_html=True)
-    
-    st.markdown('<p class="section-header">Score Components</p>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**Staff Capability**")
-        for section in staff_sections:
-            post_val = convert_to_100(post_scores[section])
-            st.markdown(f'<div class="domain-score"><div class="domain-label">{section}</div><div class="domain-bar"><div class="domain-fill" style="width: {post_val}%; background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);"></div></div><div class="domain-value">{round(post_val)}</div></div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown("**Organisational Infrastructure**")
-        st.markdown(f'<div class="metric-card"><div class="metric-label">Infrastructure Score</div><div class="metric-value">{infra_score}</div><div class="metric-detail">Policies, practices & support systems</div></div>', unsafe_allow_html=True)
-        st.markdown("")
-        st.markdown("Infrastructure measures:")
-        st.markdown("- Recruitment bias review\n- Accessible job descriptions\n- Alternative qualification recognition\n- Adapted onboarding\n- Language support available\n- Manager training\n- Flexible policies\n- Clear progression pathways")
-
-def training_pre_survey_view(partner_id):
-    st.markdown('<p class="main-header">Pre-Training Survey</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Baseline assessment before training</p>', unsafe_allow_html=True)
-    st.markdown('<div class="info-card">Each attendee uses their unique code to link pre, post and follow-up responses.</div>', unsafe_allow_html=True)
-    with st.form("pre_survey_view"):
-        col1, col2 = st.columns(2)
-        with col1:
-            session_date = st.date_input("Training Date", value=datetime.now())
-            attendee_code = st.text_input("Attendee Code *", placeholder="e.g. NHS-001")
-        with col2:
-            department = st.text_input("Department")
-        st.markdown("### Rate your agreement (1-5)")
-        questions = ["I understand the legal rights of refugees", "I can explain refugee vs asylum seeker vs migrant", "I understand barriers refugees face", "I am aware of how trauma affects behaviour", "I am aware of my own cultural biases"]
-        responses = [st.select_slider(q, options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key=f"pre_v_{i}") for i, q in enumerate(questions)]
-        if st.form_submit_button("Submit Pre-Training Survey", use_container_width=True):
-            if attendee_code:
-                data = {"partner_id": partner_id, "attendee_code": attendee_code, "session_date": session_date.isoformat(), "department": department, "submitted_at": datetime.now().isoformat()}
-                for i, r in enumerate(responses):
-                    data[f"q{i+1}"] = r
-                supabase.table("training_pre_survey").insert(data).execute()
-                st.success("Pre-training survey submitted")
-
-def training_post_survey_view(partner_id):
-    st.markdown('<p class="main-header">Post-Training Survey</p>', unsafe_allow_html=True)
-    with st.form("post_survey_view"):
-        attendee_code = st.text_input("Attendee Code *", placeholder="Same code as pre-training")
-        st.markdown("### Rate your agreement after training")
-        questions = ["I understand the legal rights of refugees", "I can explain refugee vs asylum seeker vs migrant", "I understand barriers refugees face", "I am aware of how trauma affects behaviour", "I am aware of my own cultural biases"]
-        responses = [st.select_slider(q, options=[1,2,3,4,5], value=4, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key=f"post_v_{i}") for i, q in enumerate(questions)]
-        commitment = st.text_area("I commit to applying my learning by...")
-        if st.form_submit_button("Submit Post-Training Survey", use_container_width=True):
-            if attendee_code:
-                data = {"partner_id": partner_id, "attendee_code": attendee_code, "commitment": commitment, "submitted_at": datetime.now().isoformat()}
-                for i, r in enumerate(responses):
-                    data[f"q{i+1}"] = r
-                supabase.table("training_post_survey").insert(data).execute()
-                st.success("Post-training survey submitted")
-
-def training_followup_view(partner_id):
-    st.markdown('<p class="main-header">3-Month Follow-up</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Measuring sustained learning and organisational change</p>', unsafe_allow_html=True)
-    with st.form("followup_view"):
-        attendee_code = st.text_input("Attendee Code *")
-        st.markdown("### Applied Learning")
-        applied_example = st.text_area("Describe a specific situation where you applied your learning")
-        applied_frequency = st.select_slider("How often have you applied your learning?", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Never", "Once or twice", "A few times", "Regularly", "Very frequently"][x-1])
-        st.markdown("### Organisational Changes Observed")
-        org_change = st.select_slider("I have observed positive organisational changes since the training", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1])
-        specific_changes = st.text_area("What specific changes have you observed?")
-        if st.form_submit_button("Submit Follow-up", use_container_width=True):
-            if attendee_code:
-                supabase.table("training_followup").insert({"partner_id": partner_id, "attendee_code": attendee_code, "applied_learning_text": applied_example, "applied_frequency": applied_frequency, "org_change_avg": org_change, "specific_changes": specific_changes, "submitted_at": datetime.now().isoformat()}).execute()
-                st.success("Follow-up submitted")
-
-def training_staff_feedback_view(partner_id):
-    st.markdown('<p class="main-header">Organisational Inclusion Climate Survey</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Staff perception of workplace inclusion culture</p>', unsafe_allow_html=True)
-    st.markdown('<div class="info-card">This survey measures your organisation\'s inclusion climate from the perspective of all staff.</div>', unsafe_allow_html=True)
-    with st.form("staff_feedback_view"):
-        department = st.text_input("Department *")
-        role_level = st.selectbox("Role Level", ["Frontline Staff", "Team Leader/Supervisor", "Middle Manager", "Senior Manager", "Director/Executive"])
-        attended_training = st.selectbox("Attended ACH inclusion training?", ["Yes", "No", "Scheduled to attend"])
-        st.markdown("### Organisational Commitment")
-        oc1 = st.select_slider("My organisation demonstrates genuine commitment to inclusion", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="oc1_v")
-        st.markdown("### Team Climate")
-        tc1 = st.select_slider("My team would be welcoming to a colleague from a refugee background", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="tc1_v")
-        st.markdown("### Personal Readiness")
-        pr1 = st.select_slider("I feel confident supporting colleagues from refugee backgrounds", options=[1,2,3,4,5], value=3, format_func=lambda x: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"][x-1], key="pr1_v")
-        recommendations = st.text_area("What would help your organisation become more inclusive?")
-        if st.form_submit_button("Submit Survey", use_container_width=True):
-            if department:
-                supabase.table("training_staff_feedback").insert({"partner_id": partner_id, "department": department, "role_level": role_level, "attended_training": attended_training, "oc1": oc1, "tc1": tc1, "pr1": pr1, "recommendations": recommendations, "submitted_at": datetime.now().isoformat()}).execute()
-                st.success("Survey submitted")
-
-def training_infrastructure_view(partner_id):
-    st.markdown('<p class="main-header">Infrastructure Assessment</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Organisational policies and practices</p>', unsafe_allow_html=True)
-    with st.form("infrastructure_view"):
-        st.markdown("### Refugee Employment Readiness")
-        items = [("i1", "Recruitment processes reviewed for bias"), ("i2", "Job descriptions use accessible language"), ("i3", "Alternative evidence accepted for qualifications"), ("i4", "Onboarding adapted for refugees"), ("i5", "Language support available"), ("i6", "Managers trained on supporting refugees"), ("i7", "Flexible policies for immigration appointments"), ("i8", "Clear progression pathways")]
-        responses = {}
-        for key, label in items:
-            responses[key] = st.selectbox(label, ["No", "Partial", "Yes"], key=f"{key}_v")
-        refugees_hired = st.number_input("Refugee employees hired since last assessment", min_value=0, value=0)
-        changes_made = st.text_area("Policy changes made since training")
-        if st.form_submit_button("Submit Assessment", use_container_width=True):
-            score_map = {"No": 0, "Partial": 1, "Yes": 2}
-            total = sum(score_map[v] for v in responses.values())
-            score = round((total / 16) * 100)
-            data = {"partner_id": partner_id, "total_score": score, "refugees_hired": refugees_hired, "changes_made": changes_made, "submitted_at": datetime.now().isoformat()}
-            supabase.table("training_infrastructure").insert(data).execute()
-            st.success(f"Assessment submitted. Infrastructure Score: {score}/100")
+        {"Dashboard": partner_dashboard, "Baseline Data": partner_baseline, "Interview Feedback": partner_interview_feedback, "Milestone Reviews": partner_milestone_reviews, "Impact Report": partner_reports}[page]()
 
 if __name__ == "__main__":
     main()
