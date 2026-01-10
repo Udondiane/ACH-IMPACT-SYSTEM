@@ -367,22 +367,14 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============ SESSION STATE ============
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
 if 'user_type' not in st.session_state:
-    st.session_state.user_type = None
+    st.session_state.user_type = "ach_staff"
 if 'user_id' not in st.session_state:
-    st.session_state.user_id = None
+    st.session_state.user_id = 1
 if 'user_name' not in st.session_state:
-    st.session_state.user_name = None
-
-# ============ DEMO USERS ============
-USERS = {
-    "ach_admin": {"password": "impact2024", "type": "ach_staff", "name": "ACH Administrator"},
-    "partner_demo": {"password": "partner123", "type": "partner", "name": "Grand Hotel Birmingham", "partner_id": 2},
-    "hospital_demo": {"password": "hospital123", "type": "partner", "name": "Birmingham City Hospital", "partner_id": 1},
-    "care_demo": {"password": "care123", "type": "partner", "name": "Sunrise Care Home", "partner_id": 3},
-}
+    st.session_state.user_name = "ACH Administrator"
+if 'partner_id' not in st.session_state:
+    st.session_state.partner_id = None
 
 # ============ COUNTRY FLAGS ============
 COUNTRY_FLAGS = {
@@ -394,29 +386,6 @@ COUNTRY_FLAGS = {
 
 def get_country_code(country):
     return COUNTRY_FLAGS.get(country, "")
-
-# ============ LOGIN ============
-def login_page():
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown('<p class="main-header">ACH Impact Intelligence</p>', unsafe_allow_html=True)
-        st.markdown('<p class="sub-header">Track, measure and report on the social impact your organisation creates</p>', unsafe_allow_html=True)
-        
-        with st.form("login_form"):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            submitted = st.form_submit_button("Login", use_container_width=True)
-            
-            if submitted:
-                if username in USERS and USERS[username]["password"] == password:
-                    st.session_state.logged_in = True
-                    st.session_state.user_type = USERS[username]["type"]
-                    st.session_state.user_name = USERS[username]["name"]
-                    if "partner_id" in USERS[username]:
-                        st.session_state.user_id = USERS[username]["partner_id"]
-                    st.rerun()
-                else:
-                    st.error("Invalid credentials")
 
 # ============ HELPER FUNCTIONS ============
 def get_partner_sector(partner_id):
@@ -1144,25 +1113,35 @@ def partner_reports():
 
 # ============ NAVIGATION ============
 def main():
-    if not st.session_state.logged_in:
-        login_page()
-        return
-    
     with st.sidebar:
         st.markdown(f"### {st.session_state.user_name}")
+        st.divider()
+        
+        # View switcher
+        view_type = st.radio("View As", ["ACH Staff", "Partner"], label_visibility="collapsed")
+        
+        if view_type == "Partner":
+            try:
+                partners = supabase.table("impact_partners").select("id, name").execute()
+                if partners.data:
+                    partner_options = {p["name"]: p["id"] for p in partners.data}
+                    selected_partner = st.selectbox("Select Partner", list(partner_options.keys()))
+                    st.session_state.user_type = "partner"
+                    st.session_state.user_id = partner_options[selected_partner]
+                    st.session_state.user_name = selected_partner
+            except:
+                st.warning("No partners found")
+                st.session_state.user_type = "ach_staff"
+        else:
+            st.session_state.user_type = "ach_staff"
+            st.session_state.user_name = "ACH Administrator"
+        
         st.divider()
         
         if st.session_state.user_type == "ach_staff":
             page = st.radio("Navigation", ["Dashboard", "Manage Partners", "Manage Candidates", "Candidate Inclusion Survey", "Candidate Support"], label_visibility="collapsed")
         else:
             page = st.radio("Navigation", ["Dashboard", "Inclusion Assessment", "Baseline Data", "Interview Feedback", "Milestone Reviews", "Reports"], label_visibility="collapsed")
-        
-        st.divider()
-        if st.button("Logout", use_container_width=True):
-            for key in ["logged_in", "user_type", "user_id", "user_name"]:
-                st.session_state[key] = None
-            st.session_state.logged_in = False
-            st.rerun()
     
     if st.session_state.user_type == "ach_staff":
         pages = {
