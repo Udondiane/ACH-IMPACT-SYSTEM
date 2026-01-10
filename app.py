@@ -225,33 +225,6 @@ div[data-testid="stSidebar"] { background: linear-gradient(180deg, #0f1c3f 0%, #
 div[data-testid="stSidebar"] .stMarkdown { color: white; }
 </style>""", unsafe_allow_html=True)
 
-for k in ['logged_in', 'user_type', 'user_id', 'user_name']:
-    if k not in st.session_state: st.session_state[k] = None if k != 'logged_in' else False
-
-USERS = {
-    "ach_admin": {"password": "impact2024", "type": "ach_staff", "name": "ACH Administrator"},
-    "partner_demo": {"password": "partner123", "type": "partner", "name": "Grand Hotel Birmingham", "partner_id": 2},
-    "hospital_demo": {"password": "hospital123", "type": "partner", "name": "Birmingham City Hospital", "partner_id": 1},
-    "care_demo": {"password": "care123", "type": "partner", "name": "Sunrise Care Home", "partner_id": 3},
-}
-
-def login_page():
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        st.markdown('<p class="main-header">ACH Impact Intelligence</p>', unsafe_allow_html=True)
-        st.markdown('<p class="sub-header">Track, measure and report on the social impact your organisation creates</p>', unsafe_allow_html=True)
-        with st.form("login"):
-            u = st.text_input("Username")
-            p = st.text_input("Password", type="password")
-            if st.form_submit_button("Login", use_container_width=True):
-                if u in USERS and USERS[u]["password"] == p:
-                    st.session_state.logged_in = True
-                    st.session_state.user_type = USERS[u]["type"]
-                    st.session_state.user_name = USERS[u]["name"]
-                    st.session_state.user_id = USERS[u].get("partner_id")
-                    st.rerun()
-                else: st.error("Invalid credentials")
-
 def get_partner_sector(pid):
     try:
         r = supabase.table("impact_partners").select("sector").eq("id", pid).execute()
@@ -316,9 +289,8 @@ def get_pending_reviews(pid):
     except: pass
     return pending
 
-def partner_dashboard():
+def partner_dashboard(pid):
     st.markdown('<p class="main-header">Your Impact Dashboard</p>', unsafe_allow_html=True)
-    pid = st.session_state.get("user_id", 1)
     m = calculate_impact_metrics(pid)
     c1, c2, c3 = st.columns(3)
     c1.metric("Retention Savings", f"GBP {m['retention_savings']:,.0f}", f"vs {m['sector']} avg")
@@ -371,10 +343,9 @@ def partner_dashboard():
         st.markdown('<p class="section-header">Success Stories</p>', unsafe_allow_html=True)
         for q in m["quotes"][:3]: st.markdown(f'<div class="quote-box">"{q}"</div>', unsafe_allow_html=True)
 
-def partner_inclusion_assessment():
+def partner_inclusion_assessment(pid):
     st.markdown('<p class="main-header">Inclusion Capability Assessment</p>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Rate your organisation on each dimension (1 = Strongly Disagree, 5 = Strongly Agree)</p>', unsafe_allow_html=True)
-    pid = st.session_state.get("user_id", 1)
     try:
         r = supabase.table("inclusion_employer_assessments").select("*").eq("partner_id", pid).order("created_at", desc=True).limit(1).execute()
         if r.data: st.info(f"Last assessment: {r.data[0].get('created_at', '')[:10]}. Submit new assessment below.")
@@ -395,9 +366,8 @@ def partner_inclusion_assessment():
                 st.rerun()
             except Exception as e: st.error(f"Error: {e}")
 
-def partner_incluscope_report():
+def partner_incluscope_report(pid):
     st.markdown('<p class="main-header">IncluScope Report</p>', unsafe_allow_html=True)
-    pid = st.session_state.get("user_id", 1)
     es, cs = get_inclusion_scores(pid)
     if not es:
         st.warning("No employer assessment found. Complete Inclusion Assessment first.")
@@ -534,40 +504,41 @@ def ach_manage_candidates():
                     st.rerun()
                 except Exception as e: st.error(f"Error: {e}")
 
-def partner_baseline(): st.markdown('<p class="main-header">Baseline Data</p>', unsafe_allow_html=True); st.info("Configure roles and baseline metrics.")
-def partner_interview_feedback(): st.markdown('<p class="main-header">Interview Feedback</p>', unsafe_allow_html=True); st.info("Record interview outcomes.")
-def partner_milestone_review(): st.markdown('<p class="main-header">Milestone Reviews</p>', unsafe_allow_html=True); st.info("Submit milestone reviews.")
-def partner_reports(): st.markdown('<p class="main-header">Impact Reports</p>', unsafe_allow_html=True); st.info("View and download reports.")
-
 def main():
-    if not st.session_state.logged_in:
-        login_page()
-        return
     with st.sidebar:
-        st.markdown(f"### {st.session_state.user_name}")
+        st.markdown("### ACH Impact Intelligence")
         st.divider()
-        if st.session_state.user_type == "ach_staff":
-            page = st.radio("Nav", ["Dashboard", "Manage Partners", "Manage Candidates", "Employee Inclusion Assessment"], label_visibility="collapsed")
+        
+        view = st.radio("View As", ["ACH Staff", "Partner"], label_visibility="collapsed")
+        
+        if view == "Partner":
+            try:
+                partners = supabase.table("impact_partners").select("id, name").execute()
+                if partners.data:
+                    partner_names = {p["name"]: p["id"] for p in partners.data}
+                    selected = st.selectbox("Select Partner", list(partner_names.keys()))
+                    pid = partner_names[selected]
+                else:
+                    st.warning("No partners found")
+                    pid = None
+            except:
+                pid = None
+            
+            if pid:
+                page = st.radio("Nav", ["Dashboard", "Inclusion Assessment", "IncluScope Report"], label_visibility="collapsed")
         else:
-            page = st.radio("Nav", ["Dashboard", "Inclusion Assessment", "IncluScope Report", "Baseline Data", "Interview Feedback", "Milestone Reviews", "Reports"], label_visibility="collapsed")
-        st.divider()
-        if st.button("Logout", use_container_width=True):
-            for k in ["logged_in", "user_type", "user_id", "user_name"]: st.session_state[k] = None if k != "logged_in" else False
-            st.rerun()
+            page = st.radio("Nav", ["Dashboard", "Manage Partners", "Manage Candidates", "Employee Inclusion Assessment"], label_visibility="collapsed")
     
-    pages = {
-        "Dashboard": ach_dashboard if st.session_state.user_type == "ach_staff" else partner_dashboard,
-        "Manage Partners": ach_manage_partners,
-        "Manage Candidates": ach_manage_candidates,
-        "Employee Inclusion Assessment": ach_employee_inclusion_assessment,
-        "Inclusion Assessment": partner_inclusion_assessment,
-        "IncluScope Report": partner_incluscope_report,
-        "Baseline Data": partner_baseline,
-        "Interview Feedback": partner_interview_feedback,
-        "Milestone Reviews": partner_milestone_review,
-        "Reports": partner_reports,
-    }
-    pages.get(page, partner_dashboard)()
+    if view == "ACH Staff":
+        if page == "Dashboard": ach_dashboard()
+        elif page == "Manage Partners": ach_manage_partners()
+        elif page == "Manage Candidates": ach_manage_candidates()
+        elif page == "Employee Inclusion Assessment": ach_employee_inclusion_assessment()
+    else:
+        if pid:
+            if page == "Dashboard": partner_dashboard(pid)
+            elif page == "Inclusion Assessment": partner_inclusion_assessment(pid)
+            elif page == "IncluScope Report": partner_incluscope_report(pid)
 
 if __name__ == "__main__":
     main()
