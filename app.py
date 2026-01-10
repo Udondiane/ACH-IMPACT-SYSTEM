@@ -434,6 +434,18 @@ def calculate_impact_metrics(partner_id):
             active = [p for p in placements if p.get("status") == "Active"]
             metrics["active_employees"] = len(active)
             
+            # Calculate average tenure for active employees
+            if active:
+                total_months = 0
+                for p in active:
+                    if p.get("start_date"):
+                        start = datetime.fromisoformat(str(p["start_date"]))
+                        months = (datetime.now() - start).days / 30
+                        total_months += months
+                metrics["avg_tenure_months"] = round(total_months / len(active), 1)
+            else:
+                metrics["avg_tenure_months"] = 0
+            
             if metrics["total_placements"] > 0:
                 metrics["retention_rate"] = round((len(active) / metrics["total_placements"]) * 100)
                 ach_retention_decimal = len(active) / metrics["total_placements"]
@@ -619,11 +631,12 @@ def partner_dashboard():
     # ADDITIONAL METRICS
     st.markdown('<p class="section-header">Additional Metrics</p>', unsafe_allow_html=True)
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("People Employed", metrics["active_employees"], f"of {metrics['total_placements']}")
     col2.metric("Retention Rate", f"{metrics['retention_rate']}%")
-    col3.metric("Living Wage", f"{metrics['living_wage_percent']}%")
-    col4.metric("Progressions", metrics["progression_count"])
+    col3.metric("Avg Tenure", f"{metrics.get('avg_tenure_months', 0)} months")
+    col4.metric("Living Wage", f"{metrics['living_wage_percent']}%")
+    col5.metric("Progressions", metrics["progression_count"])
     
     # PENDING REVIEWS
     pending = get_pending_reviews(partner_id)
@@ -1223,8 +1236,17 @@ def partner_milestone_review():
                         }
                         supabase.table("milestone_reviews_partner").insert(data).execute()
                         
+                        # Update placement with last milestone check
+                        placement_update = {
+                            "last_milestone_check": datetime.now().date().isoformat(),
+                            "last_milestone_month": review["milestone_month"]
+                        }
+                        
                         if still_employed == "No":
-                            supabase.table("placements").update({"status": "Left"}).eq("id", review["placement_id"]).execute()
+                            placement_update["status"] = "Left"
+                            placement_update["end_date"] = datetime.now().date().isoformat()
+                        
+                        supabase.table("placements").update(placement_update).eq("id", review["placement_id"]).execute()
                         
                         st.success("Review submitted")
                         st.rerun()
