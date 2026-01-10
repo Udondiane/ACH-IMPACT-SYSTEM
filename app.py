@@ -219,13 +219,19 @@ def calculate_retention_savings(placements, sector, ach_retention_rate):
 
 
 def calculate_diversity_contribution(placements, candidates_data):
+    """
+    Calculate diversity contribution by country of origin.
+    Only counts non-UK countries.
+    """
     country_counts = {}
     
     for p in placements:
         candidate_id = p.get("candidate_id")
         if candidate_id and candidate_id in candidates_data:
             country = candidates_data[candidate_id].get("country_of_origin", "Unknown")
-            country_counts[country] = country_counts.get(country, 0) + 1
+            # Only count non-UK countries
+            if country and country not in ["United Kingdom", "UK", "England", "Scotland", "Wales", "Northern Ireland", "Unknown", ""]:
+                country_counts[country] = country_counts.get(country, 0) + 1
     
     sorted_countries = sorted(country_counts.items(), key=lambda x: x[1], reverse=True)
     
@@ -602,13 +608,13 @@ def partner_dashboard():
     # DIVERSITY BREAKDOWN
     st.markdown('<p class="section-header">Diversity Contribution</p>', unsafe_allow_html=True)
     
-    breakdown = metrics.get("diversity_data", {}).get("breakdown", [])
-    if breakdown:
-        cols = st.columns(min(len(breakdown), 6))
-        for i, (country, count) in enumerate(breakdown[:6]):
-            cols[i].metric(country, count)
+    diversity = metrics.get("diversity_data", {})
+    if diversity.get("total_employees", 0) > 0:
+        col1, col2 = st.columns(2)
+        col1.metric("Countries Represented", diversity.get("countries_represented", 0))
+        col2.metric("Employees from Global Talent Pool", diversity.get("total_employees", 0))
     else:
-        st.info("Diversity data will appear once placements are recorded with candidate country of origin.")
+        st.info("Diversity data will appear once placements are recorded.")
     
     # ADDITIONAL METRICS
     st.markdown('<p class="section-header">Additional Metrics</p>', unsafe_allow_html=True)
@@ -1014,9 +1020,30 @@ def ach_manage_candidates():
             name = st.text_input("Full Name")
             cohort = st.text_input("Cohort/Programme")
             country_of_origin = st.selectbox("Country of Origin", 
-                ["", "Afghanistan", "Syria", "Sudan", "South Sudan", "Ukraine", "Eritrea", 
-                 "Iran", "Iraq", "Somalia", "Yemen", "Ethiopia", "Congo", "Myanmar", 
-                 "Pakistan", "Bangladesh", "Nigeria", "Other"])
+                ["", "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan",
+                "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi",
+                "Cambodia", "Cameroon", "Canada", "Cape Verde", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic",
+                "Democratic Republic of the Congo", "Denmark", "Djibouti", "Dominica", "Dominican Republic",
+                "East Timor", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia",
+                "Fiji", "Finland", "France",
+                "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana",
+                "Haiti", "Honduras", "Hungary",
+                "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Ivory Coast",
+                "Jamaica", "Japan", "Jordan",
+                "Kazakhstan", "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan",
+                "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg",
+                "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar",
+                "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway",
+                "Oman",
+                "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal",
+                "Qatar",
+                "Romania", "Russia", "Rwanda",
+                "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria",
+                "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu",
+                "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan",
+                "Vanuatu", "Vatican City", "Venezuela", "Vietnam",
+                "Yemen",
+                "Zambia", "Zimbabwe"])
             
             submitted = st.form_submit_button("Add Candidate", use_container_width=True)
             
