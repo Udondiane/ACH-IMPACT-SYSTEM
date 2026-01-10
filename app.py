@@ -737,10 +737,10 @@ def ach_dashboard():
         st.error(f"Error: {e}")
 
 
-# ============ ACH CANDIDATE SURVEY ============
-def ach_candidate_inclusion_survey():
-    st.markdown('<p class="main-header">Candidate Inclusion Survey</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Record candidate responses to inclusion questions</p>', unsafe_allow_html=True)
+# ============ ACH EMPLOYEE EXPERIENCE SURVEY (Scale Questions) ============
+def ach_employee_experience_survey():
+    st.markdown('<p class="main-header">Employee Experience Survey</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Quick pulse check - 6 scale questions (2 mins)</p>', unsafe_allow_html=True)
     
     try:
         placements = supabase.table("placements").select("*").eq("status", "Active").execute()
@@ -756,37 +756,52 @@ def ach_candidate_inclusion_survey():
             placement = placement_options[selected]
             partner_id = placement.get("partner_id")
             
-            with st.form("candidate_inclusion_survey"):
-                scores = {}
-                narratives = {}
+            with st.form("employee_experience_survey"):
+                st.markdown("Rate each statement from 1 (Strongly Disagree) to 5 (Strongly Agree)")
                 
-                for dim_key, dim_data in CANDIDATE_QUESTIONS.items():
-                    st.markdown(f"### {dim_data['name']}")
-                    
-                    scores[dim_key] = {}
-                    narratives[dim_key] = {}
-                    
-                    for layer in ["input", "conversion", "capability"]:
-                        layer_data = dim_data[layer]
-                        layer_label = {"input": "Input", "conversion": "Conversion", "capability": "Capability"}[layer]
-                        
-                        st.markdown(f"**{layer_label}**")
-                        
-                        if layer_data["type"] == "scale":
-                            scores[dim_key][layer] = st.slider(
-                                layer_data["question"],
-                                min_value=1, max_value=5, value=3,
-                                help="1 = Strongly Disagree, 5 = Strongly Agree",
-                                key=f"cand_{dim_key}_{layer}"
-                            )
-                        else:
-                            narratives[dim_key][layer] = st.text_area(
-                                layer_data["question"],
-                                key=f"cand_{dim_key}_{layer}",
-                                height=100
-                            )
-                    
-                    st.divider()
+                scores = {}
+                
+                # Economic Security - Capability
+                scores["economic_security"] = st.slider(
+                    "Do you feel your income and working hours are reliable enough to plan your life ahead?",
+                    min_value=1, max_value=5, value=3,
+                    key="exp_economic"
+                )
+                
+                # Dignity & Respect - Capability
+                scores["dignity_respect"] = st.slider(
+                    "Do you feel respected and valued as a person here?",
+                    min_value=1, max_value=5, value=3,
+                    key="exp_dignity"
+                )
+                
+                # Voice & Agency - Capability
+                scores["voice_agency"] = st.slider(
+                    "Do you feel you can make choices or influence how your work is done?",
+                    min_value=1, max_value=5, value=3,
+                    key="exp_voice"
+                )
+                
+                # Wellbeing - Capability
+                scores["wellbeing"] = st.slider(
+                    "Do you feel safe and confident about your future here?",
+                    min_value=1, max_value=5, value=3,
+                    key="exp_wellbeing"
+                )
+                
+                # Skill Growth - Capability (added for completeness)
+                scores["skill_growth"] = st.slider(
+                    "Do you feel you can use your skills and grow professionally in your role?",
+                    min_value=1, max_value=5, value=3,
+                    key="exp_skill"
+                )
+                
+                # Belonging - Capability (added for completeness)
+                scores["belonging_inclusion"] = st.slider(
+                    "Do you feel part of the team and socially connected here?",
+                    min_value=1, max_value=5, value=3,
+                    key="exp_belonging"
+                )
                 
                 submitted = st.form_submit_button("Submit Survey", use_container_width=True)
                 
@@ -796,12 +811,138 @@ def ach_candidate_inclusion_survey():
                             "partner_id": partner_id,
                             "placement_id": placement["id"],
                             "candidate_name": placement["candidate_name"],
+                            "survey_type": "experience",
                             "scores": scores,
-                            "narratives": narratives,
                             "created_at": datetime.now().isoformat()
                         }
                         supabase.table("inclusion_assessment_candidate").insert(data).execute()
                         st.success("Survey submitted successfully")
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+    except Exception as e:
+        st.error(f"Error: {e}")
+
+
+# ============ ACH EMPLOYEE VOICE INTERVIEW (Narrative Questions) ============
+def ach_employee_voice_interview():
+    st.markdown('<p class="main-header">Employee Voice Interview</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">In-depth qualitative interview - 12 narrative questions</p>', unsafe_allow_html=True)
+    
+    try:
+        placements = supabase.table("placements").select("*").eq("status", "Active").execute()
+        
+        if not placements.data:
+            st.info("No active placements to interview.")
+            return
+        
+        placement_options = {f"{p['candidate_name']} ({p.get('partner_name', 'Unknown')})": p for p in placements.data}
+        selected = st.selectbox("Select Employee", [""] + list(placement_options.keys()))
+        
+        if selected:
+            placement = placement_options[selected]
+            partner_id = placement.get("partner_id")
+            
+            with st.form("employee_voice_interview"):
+                narratives = {}
+                
+                # Economic Security
+                st.markdown("### Economic Security and Stability")
+                narratives["economic_input"] = st.text_area(
+                    "Can you describe how predictable your work and income feel here? What helps you feel secure - or makes it hard?",
+                    key="voice_econ_input", height=100
+                )
+                narratives["economic_conversion"] = st.text_area(
+                    "When schedules or pay change, how do you usually find out? How does that make you feel about the stability of your job?",
+                    key="voice_econ_conv", height=100
+                )
+                
+                st.divider()
+                
+                # Skill Growth
+                st.markdown("### Skill Use and Growth")
+                narratives["skill_input"] = st.text_area(
+                    "What kinds of learning or training opportunities do you know about here?",
+                    key="voice_skill_input", height=100
+                )
+                narratives["skill_conversion"] = st.text_area(
+                    "Can you share a time you wanted to join training or learn new skills - what helped or stopped you?",
+                    key="voice_skill_conv", height=100
+                )
+                narratives["skill_capability"] = st.text_area(
+                    "Can you describe a moment when you were able to use your abilities fully at work?",
+                    key="voice_skill_cap", height=100
+                )
+                
+                st.divider()
+                
+                # Dignity & Respect
+                st.markdown("### Workplace Dignity and Respect")
+                narratives["dignity_input"] = st.text_area(
+                    "Have you been told about policies that protect fairness or respect at work?",
+                    key="voice_dignity_input", height=100
+                )
+                narratives["dignity_conversion"] = st.text_area(
+                    "How are you usually treated by colleagues or supervisors? Can you recall a time that made you feel respected - or not?",
+                    key="voice_dignity_conv", height=100
+                )
+                
+                st.divider()
+                
+                # Voice & Agency
+                st.markdown("### Voice and Agency")
+                narratives["voice_input"] = st.text_area(
+                    "Are there ways for you to share your opinions or issues with management?",
+                    key="voice_agency_input", height=100
+                )
+                narratives["voice_conversion"] = st.text_area(
+                    "Can you tell me about a time when you spoke up about something at work? What happened afterwards?",
+                    key="voice_agency_conv", height=100
+                )
+                
+                st.divider()
+                
+                # Belonging & Inclusion
+                st.markdown("### Social Belonging and Inclusion")
+                narratives["belonging_input"] = st.text_area(
+                    "When you first joined, were there any activities that helped you meet people or feel included?",
+                    key="voice_belong_input", height=100
+                )
+                narratives["belonging_conversion"] = st.text_area(
+                    "Can you describe how your team works together day to day? Do you feel comfortable joining conversations?",
+                    key="voice_belong_conv", height=100
+                )
+                narratives["belonging_capability"] = st.text_area(
+                    "What makes you feel you belong here - or sometimes, what makes you feel apart?",
+                    key="voice_belong_cap", height=100
+                )
+                
+                st.divider()
+                
+                # Wellbeing
+                st.markdown("### Wellbeing and Confidence to Plan Ahead")
+                narratives["wellbeing_input"] = st.text_area(
+                    "What kinds of wellbeing or health support are available to you here?",
+                    key="voice_well_input", height=100
+                )
+                narratives["wellbeing_conversion"] = st.text_area(
+                    "If you need time off or help for health reasons, how easy is it to ask for and receive support?",
+                    key="voice_well_conv", height=100
+                )
+                
+                submitted = st.form_submit_button("Submit Interview", use_container_width=True)
+                
+                if submitted:
+                    try:
+                        data = {
+                            "partner_id": partner_id,
+                            "placement_id": placement["id"],
+                            "candidate_name": placement["candidate_name"],
+                            "survey_type": "voice_interview",
+                            "narratives": narratives,
+                            "created_at": datetime.now().isoformat()
+                        }
+                        supabase.table("inclusion_assessment_candidate").insert(data).execute()
+                        st.success("Interview submitted successfully")
                     except Exception as e:
                         st.error(f"Error: {e}")
     except Exception as e:
@@ -1139,7 +1280,7 @@ def main():
         st.divider()
         
         if st.session_state.user_type == "ach_staff":
-            page = st.radio("Navigation", ["Dashboard", "Manage Partners", "Manage Candidates", "Candidate Inclusion Survey", "Candidate Support"], label_visibility="collapsed")
+            page = st.radio("Navigation", ["Dashboard", "Manage Partners", "Manage Candidates", "Employee Experience Survey", "Employee Voice Interview", "Candidate Support"], label_visibility="collapsed")
         else:
             page = st.radio("Navigation", ["Dashboard", "Inclusion Assessment", "Baseline Data", "Interview Feedback", "Milestone Reviews", "Reports"], label_visibility="collapsed")
     
@@ -1148,7 +1289,8 @@ def main():
             "Dashboard": ach_dashboard,
             "Manage Partners": ach_manage_partners,
             "Manage Candidates": ach_manage_candidates,
-            "Candidate Inclusion Survey": ach_candidate_inclusion_survey,
+            "Employee Experience Survey": ach_employee_experience_survey,
+            "Employee Voice Interview": ach_employee_voice_interview,
             "Candidate Support": ach_candidate_support
         }
     else:
