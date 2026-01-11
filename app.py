@@ -339,42 +339,42 @@ CAPABILITY_DOMAINS = {
 }
 
 # ============ EMPLOYER INCLUSION ASSESSMENT (6 dimensions) ============
-ORGANISATION_QUESTIONS = {
+HOLISTIC_IMPACT_QUESTIONS = {
     "economic_security": {
-        "name": "Economic Security and Stability",
-        "input": "To what extent does the organisation provide stable contracts, transparent pay, and predictable working hours for refugee employees?",
-        "conversion": "To what extent are pay and shift arrangements implemented transparently and communicated effectively in daily practice?",
-        "capability": "To what extent do refugee employees feel economically secure and able to rely on their work for a stable livelihood?"
+        "name": "Economic Security & Stability",
+        "description": "Ability to meet basic needs and plan financially",
+        "employer": "We pay at least the real Living Wage and offer stable, predictable hours",
+        "employee": "I can comfortably cover my basic expenses and plan for the future"
     },
     "skill_growth": {
-        "name": "Skill Use and Growth",
-        "input": "To what extent does the organisation provide access to relevant training and skill development opportunities?",
-        "conversion": "To what extent can refugee employees realistically participate in these learning opportunities?",
-        "capability": "To what extent do refugee employees feel they can use their skills and grow professionally in their roles?"
+        "name": "Skill Use & Growth",
+        "description": "Ability to use existing skills and develop new ones",
+        "employer": "We provide opportunities for training and skill development relevant to employees' goals",
+        "employee": "I am able to use my skills and experience, and I have opportunities to learn and grow"
     },
     "dignity_respect": {
-        "name": "Workplace Dignity and Respect",
-        "input": "To what extent does the organisation have formal policies ensuring equal treatment and preventing discrimination?",
-        "conversion": "To what extent do managers and coworkers behave respectfully and apply these policies consistently?",
-        "capability": "To what extent do refugee employees experience dignity and equal respect in daily work life?"
+        "name": "Workplace Dignity & Respect",
+        "description": "Freedom from discrimination, fair and respectful treatment",
+        "employer": "We have clear policies and practices that ensure all employees are treated with dignity and respect",
+        "employee": "I feel respected and treated fairly at work, regardless of my background"
     },
     "voice_agency": {
-        "name": "Voice and Agency",
-        "input": "To what extent does the organisation provide formal channels for refugee employees to express feedback or concerns?",
-        "conversion": "To what extent are refugee employees' voices heard and acted upon by management?",
-        "capability": "To what extent do refugee employees feel confident and empowered to influence decisions affecting their work?"
+        "name": "Voice & Agency",
+        "description": "Ability to influence decisions and shape one's work",
+        "employer": "We actively seek and act on employee feedback and involve staff in decisions that affect them",
+        "employee": "My opinions are valued and I have influence over how I do my work"
     },
     "belonging_inclusion": {
-        "name": "Social Belonging and Inclusion",
-        "input": "To what extent does the organisation provide initiatives to support social connection and inclusion?",
-        "conversion": "To what extent do managers and teams actively encourage inclusive interactions in daily work?",
-        "capability": "To what extent do refugee employees feel part of the team and socially connected within the organisation?"
+        "name": "Social Belonging & Inclusion",
+        "description": "Feeling part of the team and workplace community",
+        "employer": "We foster a culture where all employees feel they belong and can participate fully",
+        "employee": "I feel like I belong here and have meaningful connections with colleagues"
     },
     "wellbeing": {
-        "name": "Wellbeing and Confidence to Plan Ahead",
-        "input": "To what extent does the organisation provide wellbeing and health support?",
-        "conversion": "To what extent can refugee employees actually use these wellbeing supports without stigma or barriers?",
-        "capability": "To what extent do refugee employees feel safe, healthy, and able to plan their personal and work futures?"
+        "name": "Wellbeing & Confidence to Plan Ahead",
+        "description": "Mental health support and ability to envision a future",
+        "employer": "We support employee wellbeing and help staff see a future with us",
+        "employee": "I feel positive about my future and can see opportunities ahead for me"
     }
 }
 
@@ -641,12 +641,13 @@ def calculate_him_score(partner_id, metrics):
     """
     Calculate Holistic Impact Metrics (HIM) Score out of 1000.
     
-    Business Impact Received (400 points):
-    - Retention: 200 points
-    - Diversity: 200 points
+    Functionings Achieved - Business Impact (400 points):
+    - Sustained Employment (Retention): 200 points
+    - Economic Contribution (Diversity): 200 points
     
-    Social Impact Created (600 points):
+    Capabilities Enabled - Social Impact (600 points):
     - 6 dimensions × 100 points each
+    - Combines employer assessment (50%) + employee voice (50%)
     """
     
     him_score = {
@@ -667,7 +668,8 @@ def calculate_him_score(partner_id, metrics):
         "social_impact": {
             "total": 0,
             "dimensions": {},
-            "assessment_completed": False
+            "employer_completed": False,
+            "employee_responses": 0
         }
     }
     
@@ -709,38 +711,83 @@ def calculate_him_score(partner_id, metrics):
     
     # ============ SOCIAL IMPACT (600 points) ============
     
-    # Get latest inclusion assessment
+    dimension_names = {
+        "economic_security": "Economic Security & Stability",
+        "skill_growth": "Skill Use & Growth",
+        "dignity_respect": "Workplace Dignity & Respect",
+        "voice_agency": "Voice & Agency",
+        "belonging_inclusion": "Social Belonging & Inclusion",
+        "wellbeing": "Wellbeing & Confidence to Plan Ahead"
+    }
+    
+    employer_scores = {}
+    employee_scores = {}
+    
+    # Get employer assessment
     try:
         assessment = supabase.table("inclusion_assessment_org").select("scores").eq("partner_id", partner_id).order("created_at", desc=True).limit(1).execute()
         
         if assessment.data and assessment.data[0].get("scores"):
-            him_score["social_impact"]["assessment_completed"] = True
+            him_score["social_impact"]["employer_completed"] = True
             scores = json.loads(assessment.data[0]["scores"]) if isinstance(assessment.data[0]["scores"], str) else assessment.data[0]["scores"]
             
-            dimension_names = {
-                "economic_security": "Economic Security & Stability",
-                "skill_growth": "Skill Use & Growth",
-                "dignity_respect": "Workplace Dignity & Respect",
-                "voice_agency": "Voice & Agency",
-                "belonging_inclusion": "Social Belonging & Inclusion",
-                "wellbeing": "Wellbeing & Confidence to Plan Ahead"
-            }
-            
-            for dim_key, dim_name in dimension_names.items():
+            for dim_key in dimension_names.keys():
                 if dim_key in scores:
-                    dim_scores = scores[dim_key]
-                    # Sum of input and conversion scores (each 1-5)
-                    input_score = dim_scores.get("input", 0)
-                    conversion_score = dim_scores.get("conversion", 0)
-                    # Convert to 0-100: (sum / 10) × 100
-                    dimension_score = ((input_score + conversion_score) / 10) * 100
-                    
-                    him_score["social_impact"]["dimensions"][dim_name] = round(dimension_score)
-                    him_score["social_impact"]["total"] += dimension_score
-            
-            him_score["social_impact"]["total"] = round(him_score["social_impact"]["total"])
+                    # New structure: just employer score (1-5)
+                    employer_score = scores[dim_key].get("employer", 0)
+                    # Fallback for old structure (input/conversion)
+                    if employer_score == 0:
+                        input_score = scores[dim_key].get("input", 0)
+                        conversion_score = scores[dim_key].get("conversion", 0)
+                        employer_score = (input_score + conversion_score) / 2
+                    employer_scores[dim_key] = employer_score
     except:
         pass
+    
+    # Get employee scores from milestone reviews (candidate reviews)
+    try:
+        reviews = supabase.table("milestone_reviews_candidate").select("scores").execute()
+        if reviews.data:
+            him_score["social_impact"]["employee_responses"] = len(reviews.data)
+            
+            # Aggregate employee scores by dimension
+            dim_totals = {k: [] for k in dimension_names.keys()}
+            for review in reviews.data:
+                if review.get("scores"):
+                    review_scores = json.loads(review["scores"]) if isinstance(review["scores"], str) else review["scores"]
+                    for dim_key in dimension_names.keys():
+                        if dim_key in review_scores:
+                            dim_totals[dim_key].append(review_scores[dim_key].get("employee", 0))
+            
+            for dim_key, values in dim_totals.items():
+                if values:
+                    employee_scores[dim_key] = sum(values) / len(values)
+    except:
+        pass
+    
+    # Calculate combined dimension scores
+    for dim_key, dim_name in dimension_names.items():
+        employer_val = employer_scores.get(dim_key, 0)
+        employee_val = employee_scores.get(dim_key, 0)
+        
+        if employer_val > 0 and employee_val > 0:
+            # Both available: 50% employer, 50% employee
+            combined = (employer_val + employee_val) / 2
+        elif employer_val > 0:
+            # Only employer available
+            combined = employer_val
+        elif employee_val > 0:
+            # Only employee available
+            combined = employee_val
+        else:
+            combined = 0
+        
+        # Convert 1-5 scale to 0-100
+        dimension_score = (combined / 5) * 100
+        him_score["social_impact"]["dimensions"][dim_name] = round(dimension_score)
+        him_score["social_impact"]["total"] += dimension_score
+    
+    him_score["social_impact"]["total"] = round(him_score["social_impact"]["total"])
     
     # ============ TOTAL SCORE ============
     him_score["total"] = him_score["business_impact"]["total"] + him_score["social_impact"]["total"]
@@ -1405,7 +1452,7 @@ def partner_dashboard():
         
         st.markdown(f"""
         <div class="him-score-card">
-            <div class="him-score-label">Holistic Impact Metrics</div>
+            <div class="him-score-label">HIM Score</div>
             <div class="him-score-value">{him_total}<span class="him-score-max"> / 1000</span></div>
             <div class="him-progress-bar">
                 <div class="him-progress-fill" style="width: {him_percentage}%;"></div>
@@ -1440,9 +1487,11 @@ def partner_dashboard():
         with col2:
             social_dimensions = him_score['social_impact']['dimensions']
             social_total = him_score['social_impact']['total']
+            employer_completed = him_score['social_impact']['employer_completed']
+            employee_responses = him_score['social_impact']['employee_responses']
             
             dimensions_html = ""
-            if him_score['social_impact']['assessment_completed']:
+            if employer_completed or employee_responses > 0:
                 for dim_name, dim_score in social_dimensions.items():
                     dimensions_html += f"""
                     <div class="impact-row">
@@ -1453,8 +1502,17 @@ def partner_dashboard():
                         </div>
                     </div>
                     """
+                
+                # Show data sources
+                sources = []
+                if employer_completed:
+                    sources.append("Employer assessment")
+                if employee_responses > 0:
+                    sources.append(f"{employee_responses} employee response(s)")
+                source_text = " + ".join(sources)
+                dimensions_html += f'<div style="padding-top: 10px; font-size: 0.8rem; color: #64748b;">Based on: {source_text}</div>'
             else:
-                dimensions_html = '<div style="padding: 20px; text-align: center; color: #64748b;">Complete the Inclusion Assessment to see your Social Impact scores</div>'
+                dimensions_html = '<div style="padding: 20px; text-align: center; color: #64748b;">Complete the Holistic Impact Assessment to see your Social Impact scores</div>'
             
             st.markdown(f"""
             <div class="impact-section">
@@ -1697,23 +1755,30 @@ def partner_dashboard():
                 st.warning(f"**{p['candidate_name']}** - {p['milestone']} due {p['due_date']}")
 
 
-# ============ PARTNER INCLUSION ASSESSMENT ============
+# ============ PARTNER HOLISTIC IMPACT ASSESSMENT ============
 def partner_inclusion_assessment():
-    st.markdown('<p class="main-header">Inclusion Capability Assessment</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Rate your organisation across six dimensions of inclusive employment</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-header">Holistic Impact Assessment</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Rate your organisation across six capability domains</p>', unsafe_allow_html=True)
     
     partner_id = st.session_state.get("user_id", 1)
     
-    with st.form("org_inclusion_assessment"):
+    st.info("This assessment measures your organisation's enablement of employee capabilities. Employee responses from milestone reviews will be combined with your assessment to create a complete picture.")
+    
+    with st.form("holistic_impact_assessment"):
         scores = {}
         
-        for dim_key, dim_data in ORGANISATION_QUESTIONS.items():
+        for dim_key, dim_data in HOLISTIC_IMPACT_QUESTIONS.items():
             st.markdown(f"### {dim_data['name']}")
+            st.caption(dim_data['description'])
             
             scores[dim_key] = {}
             
-            scores[dim_key]["input"] = st.slider(dim_data["input"], 1, 5, 3, key=f"{dim_key}_input")
-            scores[dim_key]["conversion"] = st.slider(dim_data["conversion"], 1, 5, 3, key=f"{dim_key}_conversion")
+            scores[dim_key]["employer"] = st.slider(
+                dim_data["employer"], 
+                1, 5, 3, 
+                key=f"{dim_key}_employer",
+                help="1 = Strongly Disagree, 5 = Strongly Agree"
+            )
             
             st.divider()
         
@@ -1728,6 +1793,8 @@ def partner_inclusion_assessment():
                 }
                 supabase.table("inclusion_assessment_org").insert(data).execute()
                 st.success("Assessment submitted successfully")
+            except Exception as e:
+                st.error(f"Error: {e}")
             except Exception as e:
                 st.error(f"Error: {e}")
 
@@ -1962,7 +2029,7 @@ def main():
             page = st.radio("Navigation", [
                 "Dashboard",
                 "Candidates",
-                "Inclusion Assessment",
+                "Holistic Impact Assessment",
                 "Reports"
             ], label_visibility="collapsed")
     
@@ -1977,7 +2044,7 @@ def main():
     else:
         pages = {
             "Dashboard": partner_dashboard,
-            "Inclusion Assessment": partner_inclusion_assessment,
+            "Holistic Impact Assessment": partner_inclusion_assessment,
             "Candidates": partner_candidates,
             "Reports": partner_reports
         }
