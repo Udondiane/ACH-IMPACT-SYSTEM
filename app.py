@@ -1222,14 +1222,8 @@ def partner_inclusion_assessment():
             
             scores[dim_key] = {}
             
-            st.markdown("**Input (Policies and Structures)**")
             scores[dim_key]["input"] = st.slider(dim_data["input"], 1, 5, 3, key=f"{dim_key}_input")
-            
-            st.markdown("**Conversion (Implementation)**")
             scores[dim_key]["conversion"] = st.slider(dim_data["conversion"], 1, 5, 3, key=f"{dim_key}_conversion")
-            
-            st.markdown("**Capability (Employee Experience)**")
-            scores[dim_key]["capability"] = st.slider(dim_data["capability"], 1, 5, 3, key=f"{dim_key}_capability")
             
             st.divider()
         
@@ -1282,11 +1276,16 @@ def partner_candidates():
                     else:
                         reason = st.selectbox("Reason for not hiring", ["Skills gap", "Experience gap", "English proficiency", "Not right fit", "Other"])
                     
+                    st.divider()
+                    confirmed = st.checkbox("I have reviewed this information and confirm it is correct")
+                    
                     submitted = st.form_submit_button("Submit", use_container_width=True)
                     
                     if submitted:
                         if not candidate or not role:
                             st.error("Please fill in required fields")
+                        elif not confirmed:
+                            st.error("Please confirm you have reviewed the information")
                         else:
                             try:
                                 cand_data = next(c for c in candidates.data if c["name"] == candidate)
@@ -1317,13 +1316,13 @@ def partner_candidates():
                                         "start_date": start_date.isoformat(),
                                         "salary": salary,
                                         "hourly_rate": round(salary / 52 / 40, 2),
-                                        "status": "Draft",
+                                        "status": "Published",
                                         "created_at": datetime.now().isoformat()
                                     }
                                     supabase.table("placements").insert(placement).execute()
                                     supabase.table("candidates").update({"status": "Placed"}).eq("id", cand_data["id"]).execute()
                                     
-                                    st.success(f"{candidate} hired successfully - pending ACH review")
+                                    st.success(f"{candidate} hired successfully")
                                 else:
                                     st.success("Feedback recorded")
                                 st.rerun()
@@ -1468,7 +1467,6 @@ def main():
                 "Dashboard",
                 "Manage Partners",
                 "Manage Candidates",
-                "Review & Publish",
                 "Capability Assessment",
                 "Candidate Support"
             ], label_visibility="collapsed")
@@ -1485,7 +1483,6 @@ def main():
             "Dashboard": ach_dashboard,
             "Manage Partners": ach_manage_partners,
             "Manage Candidates": ach_manage_candidates,
-            "Review & Publish": ach_review_publish,
             "Capability Assessment": ach_capability_assessment,
             "Candidate Support": ach_candidate_support
         }
