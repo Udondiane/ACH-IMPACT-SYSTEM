@@ -1087,7 +1087,8 @@ def ach_manage_candidates():
                             with col_yes:
                                 if st.button("Yes, delete", key=f"confirm_yes_{c['id']}"):
                                     try:
-                                        # Delete associated placements first
+                                        # Delete associated records first (order matters for foreign keys)
+                                        supabase.table("interview_feedback").delete().eq("candidate_id", c["id"]).execute()
                                         supabase.table("placements").delete().eq("candidate_id", c["id"]).execute()
                                         # Delete candidate
                                         supabase.table("candidates").delete().eq("id", c["id"]).execute()
