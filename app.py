@@ -950,50 +950,42 @@ def partner_dashboard():
     metrics = calculate_impact_metrics(partner_id)
     
     # Key Metrics
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
-        st.metric("Retention Savings", f"£{metrics['retention_savings']:,.0f}", f"vs {metrics['sector']} avg")
+        st.metric("Estimated Retention Savings", f"£{metrics['retention_savings']:,.0f}")
     
     with col2:
         diversity = metrics.get("diversity_data", {})
-        st.metric("Diversity Contribution", f"{diversity.get('countries_represented', 0)} countries", f"{diversity.get('total_employees', 0)} employees")
-    
-    with col3:
-        st.metric("Avg Tenure", f"{metrics.get('avg_tenure_months', 0)} months")
+        employees = diversity.get("total_employees", 0)
+        countries = diversity.get("countries_represented", 0)
+        if employees > 0:
+            st.metric("Diversity Contribution", f"{employees} employees", f"representing {countries} countries")
+        else:
+            st.metric("Diversity Contribution", "No data yet")
     
     # Retention Breakdown
-    st.markdown('<p class="section-header">Retention Savings Breakdown</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-header">Retention Breakdown</p>', unsafe_allow_html=True)
     
     savings_data = metrics.get("retention_savings_data", {})
     if savings_data:
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Your Retention", f"{savings_data.get('ach_retention_percent', 0)}%")
+        col1.metric("Retention Rate", f"{savings_data.get('ach_retention_percent', 0)}%")
         col2.metric("Industry Benchmark", f"{savings_data.get('industry_retention_percent', 0)}%")
         col3.metric("Your Uplift", f"+{savings_data.get('retention_uplift_percent', 0)}%")
-        col4.metric("Total Savings", f"£{savings_data.get('total_savings', 0):,.0f}")
+        col4.metric("Estimated Savings", f"£{savings_data.get('total_savings', 0):,.0f}")
         st.caption(savings_data.get('methodology', ''))
     
     # Diversity
     st.markdown('<p class="section-header">Diversity Contribution</p>', unsafe_allow_html=True)
     
     diversity = metrics.get("diversity_data", {})
-    if diversity.get("total_employees", 0) > 0:
-        col1, col2 = st.columns(2)
-        col1.metric("Countries Represented", diversity.get("countries_represented", 0))
-        col2.metric("Employees from Global Talent Pool", diversity.get("total_employees", 0))
+    employees = diversity.get("total_employees", 0)
+    countries = diversity.get("countries_represented", 0)
+    if employees > 0:
+        st.write(f"**{employees} employees with international experience, representing {countries} countries**")
     else:
         st.info("Diversity data will appear once placements are recorded")
-    
-    # Additional Metrics
-    st.markdown('<p class="section-header">Additional Metrics</p>', unsafe_allow_html=True)
-    
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("People Employed", metrics["active_employees"], f"of {metrics['total_placements']}")
-    col2.metric("Retention Rate", f"{metrics['retention_rate']}%")
-    col3.metric("Avg Tenure", f"{metrics.get('avg_tenure_months', 0)} months")
-    col4.metric("Living Wage", f"{metrics['living_wage_percent']}%")
-    col5.metric("Progressions", metrics["progression_count"])
     
     # Pending Reviews
     pending = get_pending_reviews(partner_id)
