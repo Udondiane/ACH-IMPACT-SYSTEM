@@ -1521,15 +1521,23 @@ def partner_dashboard():
         him_total = him_score["total"]
         him_percentage = (him_total / 1000) * 100
         
-        st.markdown(f"""
-        <div class="him-score-card">
-            <div class="him-score-label">Holistic Impact Score</div>
-            <div class="him-score-value">{him_total}<span style="font-size: 1.5rem; color: #64748b;"> / 1000</span></div>
-            <div class="him-progress-bar">
-                <div class="him-progress-fill" style="width: {him_percentage}%;"></div>
+        if him_total > 0:
+            st.markdown(f"""
+            <div class="him-score-card">
+                <div class="him-score-label">Holistic Impact Score</div>
+                <div class="him-score-value">{him_total}<span style="font-size: 1.5rem; color: #64748b;"> / 1000</span></div>
+                <div class="him-progress-bar">
+                    <div class="him-progress-fill" style="width: {him_percentage}%;"></div>
+                </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="him-score-card">
+                <div class="him-score-label">Holistic Impact Score</div>
+                <div style="font-size: 1rem; color: #64748b; padding: 20px 0;">Your Holistic Impact Score will appear as you record placements and complete the Holistic Impact Assessment</div>
+            </div>
+            """, unsafe_allow_html=True)
         
         # Business Impact Received Section
         col1, col2 = st.columns(2)
