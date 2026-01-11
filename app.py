@@ -1473,8 +1473,8 @@ def main():
         else:
             page = st.radio("Navigation", [
                 "Dashboard",
-                "Inclusion Assessment",
                 "Candidates",
+                "Inclusion Assessment",
                 "Reports"
             ], label_visibility="collapsed")
     
