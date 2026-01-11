@@ -1551,7 +1551,7 @@ def partner_dashboard():
         
         with col1:
             savings = metrics.get("retention_savings", 0)
-            savings_text = f"£{savings:,.0f} saved" if savings > 0 else "Calculating..."
+            savings_text = f"£{savings:,.0f} saved" if savings > 0 else "No data yet"
             
             # Diversity contribution text
             if employees > 0:
@@ -1661,7 +1661,7 @@ def partner_dashboard():
             
             st.caption(savings_data.get('methodology', ''))
         else:
-            st.info(f"Retention data will be available once placements reach 12 months. You currently have {metrics.get('active_employees', 0)} active employee(s).")
+            st.caption("No data yet.")
         
         # Pending Reviews
         pending = get_pending_reviews(partner_id)
