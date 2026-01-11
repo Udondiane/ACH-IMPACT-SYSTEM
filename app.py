@@ -1155,7 +1155,7 @@ def ach_manage_candidates():
 
 # ============ ACH CAPABILITY ASSESSMENT ============
 def ach_capability_assessment():
-    st.markdown('<p class="main-header">Candidate Capability Assessment</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-header">Candidate Holistic Impact Assessment</p>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Assess candidates across 7 capability domains</p>', unsafe_allow_html=True)
     
     try:
@@ -2124,7 +2124,7 @@ def main():
                 "Dashboard",
                 "Manage Partners",
                 "Manage Candidates",
-                "Capability Assessment",
+                "Holistic Impact Assessment",
                 "Candidate Support"
             ], label_visibility="collapsed")
         else:
@@ -2140,7 +2140,7 @@ def main():
             "Dashboard": ach_dashboard,
             "Manage Partners": ach_manage_partners,
             "Manage Candidates": ach_manage_candidates,
-            "Capability Assessment": ach_capability_assessment,
+            "Holistic Impact Assessment": ach_capability_assessment,
             "Candidate Support": ach_candidate_support
         }
     else:
