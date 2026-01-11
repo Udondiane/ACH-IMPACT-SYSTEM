@@ -822,7 +822,7 @@ def get_pending_reviews(partner_id):
 
 # ============ ACH DASHBOARD ============
 def ach_dashboard():
-    st.markdown('<p class="main-header">ACH Impact Intelligence Dashboard</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-header">HIM Dashboard</p>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Overview of refugee employment outcomes and partner engagement</p>', unsafe_allow_html=True)
     
     # Fetch all data
@@ -1805,7 +1805,7 @@ def partner_candidates():
     
     partner_id = st.session_state.get("user_id", 1)
     
-    tab1, tab2 = st.tabs(["Recruitment", "Milestone Review"])
+    tab1, tab2, tab3 = st.tabs(["Recruitment", "Milestone Review", "Current Employees"])
     
     # ============ RECRUITMENT TAB ============
     with tab1:
@@ -1943,6 +1943,55 @@ def partner_candidates():
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Error: {e}")
+    
+    # ============ CURRENT EMPLOYEES TAB ============
+    with tab3:
+        st.markdown('<p class="sub-header">View and edit current employee details</p>', unsafe_allow_html=True)
+        
+        try:
+            placements = supabase.table("placements").select("*").eq("partner_id", partner_id).eq("status", "Published").execute()
+            
+            if not placements.data:
+                st.info("No current employees")
+            else:
+                for placement in placements.data:
+                    with st.expander(f"{placement['candidate_name']} - {placement['role']}"):
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write(f"**Role:** {placement['role']}")
+                            st.write(f"**Salary:** £{placement.get('salary', 0):,}")
+                            
+                            current_start = datetime.fromisoformat(placement['start_date']).date() if placement.get('start_date') else datetime.now().date()
+                            st.write(f"**Current Start Date:** {current_start.strftime('%d/%m/%Y')}")
+                        
+                        with col2:
+                            if placement.get('start_date'):
+                                start = datetime.fromisoformat(placement['start_date'])
+                                tenure_days = (datetime.now() - start).days
+                                tenure_months = round(tenure_days / 30, 1)
+                                st.write(f"**Tenure:** {tenure_months} months")
+                        
+                        st.divider()
+                        
+                        new_start_date = st.date_input(
+                            "Edit Start Date", 
+                            value=current_start, 
+                            format="DD/MM/YYYY",
+                            key=f"start_date_{placement['id']}"
+                        )
+                        
+                        if st.button("Update Start Date", key=f"update_{placement['id']}"):
+                            try:
+                                supabase.table("placements").update({
+                                    "start_date": new_start_date.isoformat()
+                                }).eq("id", placement["id"]).execute()
+                                st.success("Start date updated")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error: {e}")
+        except Exception as e:
+            st.error(f"Error: {e}")
 
 
 # ============ PARTNER REPORTS ============
