@@ -1559,7 +1559,7 @@ def partner_dashboard():
                     </div>
                 </div>
                 <div class="impact-row">
-                    <span class="impact-metric-name">Estimated Savings</span>
+                    <span class="impact-metric-name">Estimated Retention Savings</span>
                     <div style="display: flex; align-items: center;">
                         <span class="impact-metric-value">{savings_text}</span>
                     </div>
