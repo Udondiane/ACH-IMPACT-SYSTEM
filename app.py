@@ -1512,7 +1512,7 @@ def partner_dashboard():
         
         st.markdown(f"""
         <div class="him-score-card">
-            <div class="him-score-label">Holistic Impact Metrics (HIM)</div>
+            <div class="him-score-label">Holistic Impact Score</div>
             <div class="him-score-value">{him_total}<span style="font-size: 1.5rem; color: #64748b;"> / 1000</span></div>
             <div class="him-progress-bar">
                 <div class="him-progress-fill" style="width: {him_percentage}%;"></div>
@@ -1542,6 +1542,12 @@ def partner_dashboard():
             savings = metrics.get("retention_savings", 0)
             savings_text = f"£{savings:,.0f} saved" if savings > 0 else "Calculating..."
             
+            # Diversity contribution text
+            if employees > 0:
+                diversity_text = f"{employees} employees, {countries} countries"
+            else:
+                diversity_text = "No data yet"
+            
             st.markdown(f"""
             <div class="impact-section">
                 <div class="impact-section-title">Business Impact Received</div>
@@ -1558,18 +1564,10 @@ def partner_dashboard():
                         <span class="impact-metric-value">{savings_text}</span>
                     </div>
                 </div>
-                <div class="impact-row" style="border-top: 2px solid #e2e8f0; margin-top: 10px; padding-top: 15px;">
-                    <span class="impact-metric-name">Diversity: Employees</span>
-                    <div style="display: flex; align-items: center;">
-                        <span class="impact-metric-value">{employees}</span>
-                        <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {min(employees * 20, 100)}%;"></div></div>
-                    </div>
-                </div>
                 <div class="impact-row">
-                    <span class="impact-metric-name">Diversity: Countries</span>
+                    <span class="impact-metric-name">Diversity Contribution</span>
                     <div style="display: flex; align-items: center;">
-                        <span class="impact-metric-value">{countries}</span>
-                        <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {min(countries * 25, 100)}%;"></div></div>
+                        <span class="impact-metric-value">{diversity_text}</span>
                     </div>
                 </div>
             </div>
@@ -1610,112 +1608,6 @@ def partner_dashboard():
                 {dimensions_html}
             </div>
             """, unsafe_allow_html=True)
-        
-        st.markdown('<div class="section-divider">Detailed Metrics</div>', unsafe_allow_html=True)
-        
-        # Key Metrics Row
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if metrics.get('retention_rate') is not None:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-label">Estimated Retention Savings</div>
-                    <div class="metric-value">£{metrics['retention_savings']:,.0f}</div>
-                    <div class="metric-subtext">↑ vs industry average (12-month retention)</div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-label">Estimated Retention Savings</div>
-                    <div class="metric-value">—</div>
-                    <div class="metric-subtext">Available after 12 months</div>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        with col2:
-            diversity = metrics.get("diversity_data", {})
-            employees = diversity.get("total_employees", 0)
-            countries = diversity.get("countries_represented", 0)
-            if employees > 0:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-label">Diversity Contribution</div>
-                    <div class="metric-value">{employees} employees</div>
-                    <div class="metric-subtext">representing {countries} countries</div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown("""
-                <div class="metric-card">
-                    <div class="metric-label">Diversity Contribution</div>
-                    <div class="metric-value">—</div>
-                    <div class="metric-subtext">No data yet</div>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # Retention Breakdown
-        st.markdown('<div class="section-divider">Estimated Retention Savings Breakdown</div>', unsafe_allow_html=True)
-        
-        savings_data = metrics.get("retention_savings_data", {})
-        retention_rate = metrics.get("retention_rate")
-        
-        if retention_rate is not None and savings_data:
-            st.caption(f"Based on {metrics.get('placements_12m_plus', 0)} placements that have reached 12 months")
-            
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.markdown(f"""
-                <div class="breakdown-card">
-                    <div class="breakdown-value">{savings_data.get('ach_retention_percent', 0)}%</div>
-                    <div class="breakdown-label">12-Month Retention</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col2:
-                st.markdown(f"""
-                <div class="breakdown-card">
-                    <div class="breakdown-value">{savings_data.get('industry_retention_percent', 0)}%</div>
-                    <div class="breakdown-label">Industry Benchmark</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col3:
-                st.markdown(f"""
-                <div class="breakdown-card">
-                    <div class="breakdown-value" style="color: #22c55e;">+{savings_data.get('retention_uplift_percent', 0)}%</div>
-                    <div class="breakdown-label">Your Uplift</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col4:
-                st.markdown(f"""
-                <div class="breakdown-card">
-                    <div class="breakdown-value">£{savings_data.get('total_savings', 0):,.0f}</div>
-                    <div class="breakdown-label">Estimated Savings</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            st.caption(savings_data.get('methodology', ''))
-        else:
-            st.info(f"Retention data will be available once placements reach 12 months. You currently have {metrics.get('active_employees', 0)} active employee(s).")
-        
-        # Diversity
-        st.markdown('<div class="section-divider">Diversity Contribution</div>', unsafe_allow_html=True)
-        
-        diversity = metrics.get("diversity_data", {})
-        employees = diversity.get("total_employees", 0)
-        countries = diversity.get("countries_represented", 0)
-        if employees > 0:
-            st.markdown(f"""
-            <div class="diversity-highlight">
-                <div class="diversity-text">{employees} employees with international experience, representing {countries} countries</div>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.info("Diversity data will appear once placements are recorded")
         
         # Pending Reviews
         pending = get_pending_reviews(partner_id)
