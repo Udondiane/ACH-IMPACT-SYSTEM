@@ -677,18 +677,27 @@ def calculate_him_score(partner_id, metrics):
     
     # Retention Score (200 points)
     retention_rate = metrics.get("retention_rate")
-    if retention_rate is not None:
-        # Retention rate points (0-100): direct percentage
-        retention_rate_points = min(100, retention_rate)
-        
-        # Uplift points (0-100): uplift × 5, capped at 100
-        savings_data = metrics.get("retention_savings_data", {})
-        uplift = savings_data.get("retention_uplift_percent", 0)
-        uplift_points = min(100, max(0, uplift * 5))
-        
-        him_score["business_impact"]["retention"]["retention_rate_points"] = round(retention_rate_points)
-        him_score["business_impact"]["retention"]["uplift_points"] = round(uplift_points)
-        him_score["business_impact"]["retention"]["score"] = round(retention_rate_points + uplift_points)
+    
+    # If 12-month retention not available, use current retention
+    if retention_rate is None:
+        total_placements = metrics.get("total_placements", 0)
+        active = metrics.get("active_employees", 0)
+        if total_placements > 0:
+            retention_rate = round((active / total_placements) * 100)
+        else:
+            retention_rate = 0
+    
+    # Retention rate points (0-100): direct percentage
+    retention_rate_points = min(100, retention_rate)
+    
+    # Uplift points (0-100): uplift × 5, capped at 100
+    savings_data = metrics.get("retention_savings_data", {})
+    uplift = savings_data.get("retention_uplift_percent", 0)
+    uplift_points = min(100, max(0, uplift * 5))
+    
+    him_score["business_impact"]["retention"]["retention_rate_points"] = round(retention_rate_points)
+    him_score["business_impact"]["retention"]["uplift_points"] = round(uplift_points)
+    him_score["business_impact"]["retention"]["score"] = round(retention_rate_points + uplift_points)
     
     # Diversity Score (200 points)
     diversity = metrics.get("diversity_data", {})
@@ -1503,8 +1512,8 @@ def partner_dashboard():
         
         st.markdown(f"""
         <div class="him-score-card">
-            <div class="him-score-label">HIM Score</div>
-            <div class="him-score-value">{him_total}<span class="him-score-max"> / 1000</span></div>
+            <div class="him-score-label">Holistic Impact Metrics (HIM)</div>
+            <div class="him-score-value">{him_total}<span style="font-size: 1.5rem; color: #64748b;"> / 1000</span></div>
             <div class="him-progress-bar">
                 <div class="him-progress-fill" style="width: {him_percentage}%;"></div>
             </div>
@@ -1514,22 +1523,53 @@ def partner_dashboard():
         # Business Impact Received Section
         col1, col2 = st.columns(2)
         
+        # Get actual metrics for display
+        retention_rate = metrics.get("retention_rate")
+        if retention_rate is None:
+            # Use current retention if 12-month not available
+            total_placements = metrics.get("total_placements", 0)
+            active = metrics.get("active_employees", 0)
+            if total_placements > 0:
+                retention_rate = round((active / total_placements) * 100)
+            else:
+                retention_rate = 0
+        
+        diversity = metrics.get("diversity_data", {})
+        employees = diversity.get("total_employees", 0)
+        countries = diversity.get("countries_represented", 0)
+        
         with col1:
+            savings = metrics.get("retention_savings", 0)
+            savings_text = f"£{savings:,.0f} saved" if savings > 0 else "Calculating..."
+            
             st.markdown(f"""
             <div class="impact-section">
-                <div class="impact-section-title">Business Impact Received ({him_score['business_impact']['total']} / 400)</div>
+                <div class="impact-section-title">Business Impact Received</div>
                 <div class="impact-row">
-                    <span class="impact-metric-name">Retention Score</span>
+                    <span class="impact-metric-name">12-Month Retention</span>
                     <div style="display: flex; align-items: center;">
-                        <span class="impact-metric-value">{him_score['business_impact']['retention']['score']} / 200</span>
-                        <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {(him_score['business_impact']['retention']['score']/200)*100}%;"></div></div>
+                        <span class="impact-metric-value">{retention_rate}%</span>
+                        <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {min(retention_rate, 100)}%;"></div></div>
                     </div>
                 </div>
                 <div class="impact-row">
-                    <span class="impact-metric-name">Diversity Score</span>
+                    <span class="impact-metric-name">Estimated Savings</span>
                     <div style="display: flex; align-items: center;">
-                        <span class="impact-metric-value">{him_score['business_impact']['diversity']['score']} / 200</span>
-                        <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {(him_score['business_impact']['diversity']['score']/200)*100}%;"></div></div>
+                        <span class="impact-metric-value">{savings_text}</span>
+                    </div>
+                </div>
+                <div class="impact-row" style="border-top: 2px solid #e2e8f0; margin-top: 10px; padding-top: 15px;">
+                    <span class="impact-metric-name">Diversity: Employees</span>
+                    <div style="display: flex; align-items: center;">
+                        <span class="impact-metric-value">{employees}</span>
+                        <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {min(employees * 20, 100)}%;"></div></div>
+                    </div>
+                </div>
+                <div class="impact-row">
+                    <span class="impact-metric-name">Diversity: Countries</span>
+                    <div style="display: flex; align-items: center;">
+                        <span class="impact-metric-value">{countries}</span>
+                        <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {min(countries * 25, 100)}%;"></div></div>
                     </div>
                 </div>
             </div>
@@ -1537,7 +1577,6 @@ def partner_dashboard():
         
         with col2:
             social_dimensions = him_score['social_impact']['dimensions']
-            social_total = him_score['social_impact']['total']
             employer_completed = him_score['social_impact']['employer_completed']
             employee_responses = him_score['social_impact']['employee_responses']
             
@@ -1548,7 +1587,7 @@ def partner_dashboard():
                     <div class="impact-row">
                         <span class="impact-metric-name">{dim_name}</span>
                         <div style="display: flex; align-items: center;">
-                            <span class="impact-metric-value">{dim_score}</span>
+                            <span class="impact-metric-value">{dim_score}%</span>
                             <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {dim_score}%;"></div></div>
                         </div>
                     </div>
@@ -1567,7 +1606,7 @@ def partner_dashboard():
             
             st.markdown(f"""
             <div class="impact-section">
-                <div class="impact-section-title">Social Impact Created ({social_total} / 600)</div>
+                <div class="impact-section-title">Social Impact Created</div>
                 {dimensions_html}
             </div>
             """, unsafe_allow_html=True)
