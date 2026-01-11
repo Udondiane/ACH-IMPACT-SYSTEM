@@ -1271,10 +1271,10 @@ def partner_candidates():
                     hired = st.radio("Offered Position? *", ["Yes", "No"], horizontal=True)
                     
                     if hired == "Yes":
+                        feedback_text = st.text_area("What stood out about this candidate?")
                         start_date = st.date_input("Start Date")
-                        standout = st.text_area("What stood out about this candidate?")
                     else:
-                        reason = st.selectbox("Reason for not hiring", ["Skills gap", "Experience gap", "English proficiency", "Not right fit", "Other"])
+                        feedback_text = st.text_area("Reason for not progressing")
                     
                     st.divider()
                     confirmed = st.checkbox("I have reviewed this information and confirm it is correct")
@@ -1297,8 +1297,8 @@ def partner_candidates():
                                     "role": role,
                                     "interview_date": interview_date.isoformat(),
                                     "hired": hired == "Yes",
-                                    "standout_reason": standout if hired == "Yes" else None,
-                                    "rejection_reason": reason if hired == "No" else None,
+                                    "standout_reason": feedback_text if hired == "Yes" else None,
+                                    "rejection_reason": feedback_text if hired == "No" else None,
                                     "created_at": datetime.now().isoformat()
                                 }
                                 supabase.table("interview_feedback").insert(feedback).execute()
