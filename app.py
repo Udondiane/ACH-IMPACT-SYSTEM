@@ -1568,14 +1568,15 @@ def partner_dashboard():
                 suitability_text = "No reviews yet"
                 suitability_bar = ""
             
-            st.markdown(f"""
-            <div class="impact-section">
+            retention_bar_width = min(retention_rate, 100)
+            
+            business_html = f'''<div class="impact-section">
                 <div class="impact-section-title">Business Impact Received</div>
                 <div class="impact-row">
                     <span class="impact-metric-name">12-Month Retention</span>
                     <div style="display: flex; align-items: center;">
                         <span class="impact-metric-value">{retention_rate}%</span>
-                        <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {min(retention_rate, 100)}%;"></div></div>
+                        <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {retention_bar_width}%;"></div></div>
                     </div>
                 </div>
                 <div class="impact-row">
@@ -1597,8 +1598,8 @@ def partner_dashboard():
                         <span class="impact-metric-value">{diversity_text}</span>
                     </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+            </div>'''
+            st.markdown(business_html, unsafe_allow_html=True)
         
         with col2:
             social_dimensions = him_score['social_impact']['dimensions']
@@ -1608,15 +1609,13 @@ def partner_dashboard():
             dimensions_html = ""
             if employer_completed or employee_responses > 0:
                 for dim_name, dim_score in social_dimensions.items():
-                    dimensions_html += f"""
-                    <div class="impact-row">
+                    dimensions_html += f'''<div class="impact-row">
                         <span class="impact-metric-name">{dim_name}</span>
                         <div style="display: flex; align-items: center;">
                             <span class="impact-metric-value">{dim_score}%</span>
                             <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {dim_score}%;"></div></div>
                         </div>
-                    </div>
-                    """
+                    </div>'''
                 
                 # Show data sources
                 sources = []
@@ -1629,12 +1628,11 @@ def partner_dashboard():
             else:
                 dimensions_html = '<div style="padding: 20px; text-align: center; color: #64748b;">Complete the Holistic Impact Assessment to see your Social Impact scores</div>'
             
-            st.markdown(f"""
-            <div class="impact-section">
+            social_html = f'''<div class="impact-section">
                 <div class="impact-section-title">Social Impact Created</div>
                 {dimensions_html}
-            </div>
-            """, unsafe_allow_html=True)
+            </div>'''
+            st.markdown(social_html, unsafe_allow_html=True)
         
         # Retention Breakdown
         st.markdown('<div class="section-divider">Estimated Retention Savings Breakdown</div>', unsafe_allow_html=True)
