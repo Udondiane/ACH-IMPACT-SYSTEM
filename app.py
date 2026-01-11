@@ -433,40 +433,95 @@ if 'user_name' not in st.session_state:
 
 # ============ HELPER FUNCTIONS ============
 def get_replacement_multiplier(salary):
-    if salary < 24000:
-        return 0.15
-    elif salary < 28000:
-        return 0.18
+    """
+    Replacement cost as percentage of salary.
+    Based on Oxford Economics, CIPD, and Centric HR research:
+    - Entry level: ~16% (Centric HR)
+    - Mid-range: 6 months salary = 50% (Oxford Economics)
+    - Senior: 9 months salary = 75% (Oxford Economics)
+    - Executive: 100%+ (multiple sources)
+    """
+    if salary < 25000:
+        return 0.16  # Entry level / low-paying jobs
     elif salary < 35000:
-        return 0.22
-    elif salary < 45000:
-        return 0.25
+        return 0.50  # Mid-range (6 months salary)
+    elif salary < 50000:
+        return 0.75  # Senior (9 months salary)
     else:
-        return 0.30
+        return 1.00  # Executive / specialist
 
 def calculate_retention_savings(placements, sector, ach_retention_rate):
+    """
+    Calculate actual savings based on extra employees retained vs industry average.
+    
+    Method:
+    1. Count how many industry would expect to retain
+    2. Count how many we actually retained
+    3. Extra retained = Actual - Expected
+    4. Savings = Sum of replacement costs for extra retained employees
+    """
     benchmark_data = get_sector_benchmark(sector)
     industry_retention = benchmark_data["retention_12m"]
     benchmark_source = benchmark_data["source"]
     
-    retention_uplift = max(0, ach_retention_rate - industry_retention)
-    total_savings = 0
+    total_placements = len(placements)
+    if total_placements == 0:
+        return {
+            "total_savings": 0,
+            "ach_retention_percent": 0,
+            "industry_retention_percent": round(industry_retention * 100, 1),
+            "retention_uplift_percent": 0,
+            "extra_retained": 0,
+            "benchmark_source": benchmark_source,
+            "methodology": ""
+        }
     
-    for p in placements:
+    # Calculate replacement costs for each placement
+    retained_placements = [p for p in placements if p.get("status") == "Published" or 
+                          (p.get("end_date") and 
+                           (datetime.fromisoformat(str(p["end_date"])) - datetime.fromisoformat(str(p["start_date"]))).days >= 365)]
+    
+    # Sort retained placements by replacement cost (highest first)
+    retained_with_costs = []
+    for p in retained_placements:
         salary = p.get("salary") or 0
         if salary > 0:
             multiplier = get_replacement_multiplier(salary)
             replacement_cost = salary * multiplier
-            savings = retention_uplift * replacement_cost
-            total_savings += savings
+            retained_with_costs.append({"placement": p, "replacement_cost": replacement_cost})
+    
+    retained_with_costs.sort(key=lambda x: x["replacement_cost"], reverse=True)
+    
+    # How many would industry expect to retain?
+    industry_expected_retained = round(total_placements * industry_retention)
+    actual_retained = len(retained_placements)
+    extra_retained = max(0, actual_retained - industry_expected_retained)
+    
+    # Savings = replacement costs of extra retained employees (take highest cost ones)
+    total_savings = 0
+    for i in range(extra_retained):
+        if i < len(retained_with_costs):
+            total_savings += retained_with_costs[i]["replacement_cost"]
+    
+    # Calculate average replacement cost for methodology text
+    avg_replacement_cost = 0
+    if retained_with_costs:
+        avg_replacement_cost = sum(r["replacement_cost"] for r in retained_with_costs) / len(retained_with_costs)
+    
+    methodology = f"Based on {benchmark_source} ({round(industry_retention * 100)}% industry 12-month retention). "
+    if extra_retained > 0:
+        methodology += f"You retained {extra_retained} more employee(s) than industry average, saving an estimated £{total_savings:,.0f} in replacement costs."
+    else:
+        methodology += f"Replacement costs based on Oxford Economics and CIPD research (16-100% of salary by role level)."
     
     return {
         "total_savings": round(total_savings, 2),
         "ach_retention_percent": round(ach_retention_rate * 100, 1),
         "industry_retention_percent": round(industry_retention * 100, 1),
-        "retention_uplift_percent": round(retention_uplift * 100, 1),
+        "retention_uplift_percent": round((ach_retention_rate - industry_retention) * 100, 1),
+        "extra_retained": extra_retained,
         "benchmark_source": benchmark_source,
-        "methodology": f"Based on {benchmark_source} ({round(industry_retention * 100)}% industry retention) and CIPD replacement cost estimates."
+        "methodology": methodology
     }
 
 def calculate_diversity_contribution(placements, candidates_data):
@@ -500,7 +555,7 @@ def calculate_impact_metrics(partner_id):
     metrics = {
         "total_placements": 0,
         "active_employees": 0,
-        "retention_rate": 0,
+        "retention_rate": None,  # None means not enough data
         "retention_savings": 0,
         "retention_savings_data": {},
         "diversity_data": {},
@@ -509,7 +564,9 @@ def calculate_impact_metrics(partner_id):
         "progression_count": 0,
         "training_count": 0,
         "quotes": [],
-        "sector": sector
+        "sector": sector,
+        "placements_12m_plus": 0,
+        "retained_12m_plus": 0
     }
     
     placements = []
@@ -531,10 +588,26 @@ def calculate_impact_metrics(partner_id):
                         total_months += months
                 metrics["avg_tenure_months"] = round(total_months / len(active), 1)
             
-            if metrics["total_placements"] > 0:
-                metrics["retention_rate"] = round((len(active) / metrics["total_placements"]) * 100)
-                ach_retention_decimal = len(active) / metrics["total_placements"]
-                savings_data = calculate_retention_savings(placements, sector, ach_retention_decimal)
+            # 12-month retention calculation
+            # Only count placements that started 12+ months ago
+            placements_12m_plus = []
+            for p in placements:
+                if p.get("start_date"):
+                    start = datetime.fromisoformat(str(p["start_date"]))
+                    months_since_start = (datetime.now() - start).days / 30
+                    if months_since_start >= 12:
+                        placements_12m_plus.append(p)
+            
+            metrics["placements_12m_plus"] = len(placements_12m_plus)
+            
+            if placements_12m_plus:
+                # Of those 12+ month placements, how many are still employed?
+                retained = [p for p in placements_12m_plus if p.get("status") == "Published"]
+                metrics["retained_12m_plus"] = len(retained)
+                metrics["retention_rate"] = round((len(retained) / len(placements_12m_plus)) * 100)
+                
+                ach_retention_decimal = len(retained) / len(placements_12m_plus)
+                savings_data = calculate_retention_savings(placements_12m_plus, sector, ach_retention_decimal)
                 metrics["retention_savings"] = savings_data["total_savings"]
                 metrics["retention_savings_data"] = savings_data
             
@@ -562,6 +635,118 @@ def calculate_impact_metrics(partner_id):
         pass
     
     return metrics
+
+
+def calculate_him_score(partner_id, metrics):
+    """
+    Calculate Holistic Impact Metrics (HIM) Score out of 1000.
+    
+    Business Impact Received (400 points):
+    - Retention: 200 points
+    - Diversity: 200 points
+    
+    Social Impact Created (600 points):
+    - 6 dimensions × 100 points each
+    """
+    
+    him_score = {
+        "total": 0,
+        "business_impact": {
+            "total": 0,
+            "retention": {
+                "score": 0,
+                "retention_rate_points": 0,
+                "uplift_points": 0
+            },
+            "diversity": {
+                "score": 0,
+                "employee_points": 0,
+                "country_points": 0
+            }
+        },
+        "social_impact": {
+            "total": 0,
+            "dimensions": {},
+            "assessment_completed": False
+        }
+    }
+    
+    # ============ BUSINESS IMPACT (400 points) ============
+    
+    # Retention Score (200 points)
+    retention_rate = metrics.get("retention_rate")
+    if retention_rate is not None:
+        # Retention rate points (0-100): direct percentage
+        retention_rate_points = min(100, retention_rate)
+        
+        # Uplift points (0-100): uplift × 5, capped at 100
+        savings_data = metrics.get("retention_savings_data", {})
+        uplift = savings_data.get("retention_uplift_percent", 0)
+        uplift_points = min(100, max(0, uplift * 5))
+        
+        him_score["business_impact"]["retention"]["retention_rate_points"] = round(retention_rate_points)
+        him_score["business_impact"]["retention"]["uplift_points"] = round(uplift_points)
+        him_score["business_impact"]["retention"]["score"] = round(retention_rate_points + uplift_points)
+    
+    # Diversity Score (200 points)
+    diversity = metrics.get("diversity_data", {})
+    employees = diversity.get("total_employees", 0)
+    countries = diversity.get("countries_represented", 0)
+    
+    # Employee points: 20 per employee, capped at 100
+    employee_points = min(100, employees * 20)
+    # Country points: 25 per country, capped at 100
+    country_points = min(100, countries * 25)
+    
+    him_score["business_impact"]["diversity"]["employee_points"] = employee_points
+    him_score["business_impact"]["diversity"]["country_points"] = country_points
+    him_score["business_impact"]["diversity"]["score"] = employee_points + country_points
+    
+    him_score["business_impact"]["total"] = (
+        him_score["business_impact"]["retention"]["score"] + 
+        him_score["business_impact"]["diversity"]["score"]
+    )
+    
+    # ============ SOCIAL IMPACT (600 points) ============
+    
+    # Get latest inclusion assessment
+    try:
+        assessment = supabase.table("inclusion_assessment_org").select("scores").eq("partner_id", partner_id).order("created_at", desc=True).limit(1).execute()
+        
+        if assessment.data and assessment.data[0].get("scores"):
+            him_score["social_impact"]["assessment_completed"] = True
+            scores = json.loads(assessment.data[0]["scores"]) if isinstance(assessment.data[0]["scores"], str) else assessment.data[0]["scores"]
+            
+            dimension_names = {
+                "economic_security": "Economic Security & Stability",
+                "skill_growth": "Skill Use & Growth",
+                "dignity_respect": "Workplace Dignity & Respect",
+                "voice_agency": "Voice & Agency",
+                "belonging_inclusion": "Social Belonging & Inclusion",
+                "wellbeing": "Wellbeing & Confidence to Plan Ahead"
+            }
+            
+            for dim_key, dim_name in dimension_names.items():
+                if dim_key in scores:
+                    dim_scores = scores[dim_key]
+                    # Sum of input and conversion scores (each 1-5)
+                    input_score = dim_scores.get("input", 0)
+                    conversion_score = dim_scores.get("conversion", 0)
+                    # Convert to 0-100: (sum / 10) × 100
+                    dimension_score = ((input_score + conversion_score) / 10) * 100
+                    
+                    him_score["social_impact"]["dimensions"][dim_name] = round(dimension_score)
+                    him_score["social_impact"]["total"] += dimension_score
+            
+            him_score["social_impact"]["total"] = round(him_score["social_impact"]["total"])
+    except:
+        pass
+    
+    # ============ TOTAL SCORE ============
+    him_score["total"] = him_score["business_impact"]["total"] + him_score["social_impact"]["total"]
+    
+    return him_score
+
 
 def get_pending_reviews(partner_id):
     pending = []
@@ -1043,6 +1228,7 @@ def partner_dashboard():
         pass
     
     metrics = calculate_impact_metrics(partner_id)
+    him_score = calculate_him_score(partner_id, metrics)
     
     if partner_tier == "Impact Partner":
         # Full dashboard for Impact Partners
@@ -1050,6 +1236,89 @@ def partner_dashboard():
         # Custom styling for better layout
         st.markdown("""
         <style>
+            .him-score-card {
+                background: linear-gradient(135deg, #0f1c3f 0%, #1a2d5a 100%);
+                border-radius: 20px;
+                padding: 40px;
+                text-align: center;
+                margin-bottom: 30px;
+                color: white;
+            }
+            .him-score-label {
+                font-size: 1rem;
+                opacity: 0.9;
+                margin-bottom: 10px;
+                letter-spacing: 2px;
+                text-transform: uppercase;
+            }
+            .him-score-value {
+                font-size: 4rem;
+                font-weight: 700;
+                margin-bottom: 10px;
+            }
+            .him-score-max {
+                font-size: 1.5rem;
+                opacity: 0.7;
+            }
+            .him-progress-bar {
+                background: rgba(255,255,255,0.2);
+                border-radius: 10px;
+                height: 12px;
+                margin-top: 20px;
+                overflow: hidden;
+            }
+            .him-progress-fill {
+                background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+                height: 100%;
+                border-radius: 10px;
+                transition: width 0.5s ease;
+            }
+            .impact-section {
+                background: white;
+                border-radius: 16px;
+                padding: 25px;
+                margin-bottom: 20px;
+                border: 1px solid #e2e8f0;
+            }
+            .impact-section-title {
+                font-size: 1.1rem;
+                font-weight: 600;
+                color: #0f1c3f;
+                margin-bottom: 20px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #e2e8f0;
+            }
+            .impact-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 0;
+                border-bottom: 1px solid #f1f5f9;
+            }
+            .impact-row:last-child {
+                border-bottom: none;
+            }
+            .impact-metric-name {
+                color: #475569;
+                font-size: 0.95rem;
+            }
+            .impact-metric-value {
+                font-weight: 600;
+                color: #0f1c3f;
+            }
+            .impact-metric-bar {
+                background: #e2e8f0;
+                border-radius: 4px;
+                height: 8px;
+                width: 100px;
+                margin-left: 15px;
+                overflow: hidden;
+            }
+            .impact-metric-fill {
+                background: linear-gradient(90deg, #0f1c3f 0%, #1a2d5a 100%);
+                height: 100%;
+                border-radius: 4px;
+            }
             .metric-card {
                 background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
                 border-radius: 16px;
@@ -1130,17 +1399,92 @@ def partner_dashboard():
         </style>
         """, unsafe_allow_html=True)
         
-        # Key Metrics Row
+        # HIM Score Card
+        him_total = him_score["total"]
+        him_percentage = (him_total / 1000) * 100
+        
+        st.markdown(f"""
+        <div class="him-score-card">
+            <div class="him-score-label">Holistic Impact Metrics</div>
+            <div class="him-score-value">{him_total}<span class="him-score-max"> / 1000</span></div>
+            <div class="him-progress-bar">
+                <div class="him-progress-fill" style="width: {him_percentage}%;"></div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Business Impact Received Section
         col1, col2 = st.columns(2)
         
         with col1:
             st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">Estimated Retention Savings</div>
-                <div class="metric-value">£{metrics['retention_savings']:,.0f}</div>
-                <div class="metric-subtext">↑ vs industry average</div>
+            <div class="impact-section">
+                <div class="impact-section-title">Business Impact Received ({him_score['business_impact']['total']} / 400)</div>
+                <div class="impact-row">
+                    <span class="impact-metric-name">Retention Score</span>
+                    <div style="display: flex; align-items: center;">
+                        <span class="impact-metric-value">{him_score['business_impact']['retention']['score']} / 200</span>
+                        <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {(him_score['business_impact']['retention']['score']/200)*100}%;"></div></div>
+                    </div>
+                </div>
+                <div class="impact-row">
+                    <span class="impact-metric-name">Diversity Score</span>
+                    <div style="display: flex; align-items: center;">
+                        <span class="impact-metric-value">{him_score['business_impact']['diversity']['score']} / 200</span>
+                        <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {(him_score['business_impact']['diversity']['score']/200)*100}%;"></div></div>
+                    </div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
+        
+        with col2:
+            social_dimensions = him_score['social_impact']['dimensions']
+            social_total = him_score['social_impact']['total']
+            
+            dimensions_html = ""
+            if him_score['social_impact']['assessment_completed']:
+                for dim_name, dim_score in social_dimensions.items():
+                    dimensions_html += f"""
+                    <div class="impact-row">
+                        <span class="impact-metric-name">{dim_name}</span>
+                        <div style="display: flex; align-items: center;">
+                            <span class="impact-metric-value">{dim_score}</span>
+                            <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {dim_score}%;"></div></div>
+                        </div>
+                    </div>
+                    """
+            else:
+                dimensions_html = '<div style="padding: 20px; text-align: center; color: #64748b;">Complete the Inclusion Assessment to see your Social Impact scores</div>'
+            
+            st.markdown(f"""
+            <div class="impact-section">
+                <div class="impact-section-title">Social Impact Created ({social_total} / 600)</div>
+                {dimensions_html}
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown('<div class="section-divider">Detailed Metrics</div>', unsafe_allow_html=True)
+        
+        # Key Metrics Row
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if metrics.get('retention_rate') is not None:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-label">Estimated Retention Savings</div>
+                    <div class="metric-value">£{metrics['retention_savings']:,.0f}</div>
+                    <div class="metric-subtext">↑ vs industry average (12-month retention)</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-label">Estimated Retention Savings</div>
+                    <div class="metric-value">—</div>
+                    <div class="metric-subtext">Available after 12 months</div>
+                </div>
+                """, unsafe_allow_html=True)
         
         with col2:
             diversity = metrics.get("diversity_data", {})
@@ -1167,14 +1511,18 @@ def partner_dashboard():
         st.markdown('<div class="section-divider">Estimated Retention Savings Breakdown</div>', unsafe_allow_html=True)
         
         savings_data = metrics.get("retention_savings_data", {})
-        if savings_data:
+        retention_rate = metrics.get("retention_rate")
+        
+        if retention_rate is not None and savings_data:
+            st.caption(f"Based on {metrics.get('placements_12m_plus', 0)} placements that have reached 12 months")
+            
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
                 st.markdown(f"""
                 <div class="breakdown-card">
                     <div class="breakdown-value">{savings_data.get('ach_retention_percent', 0)}%</div>
-                    <div class="breakdown-label">Retention Rate</div>
+                    <div class="breakdown-label">12-Month Retention</div>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -1203,6 +1551,8 @@ def partner_dashboard():
                 """, unsafe_allow_html=True)
             
             st.caption(savings_data.get('methodology', ''))
+        else:
+            st.info(f"Retention data will be available once placements reach 12 months. You currently have {metrics.get('active_employees', 0)} active employee(s).")
         
         # Diversity
         st.markdown('<div class="section-divider">Diversity Contribution</div>', unsafe_allow_html=True)
