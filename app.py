@@ -618,7 +618,7 @@ def ach_dashboard():
     col2.metric("Total Candidates", len(candidates_data))
     col3.metric("Total Placements", len(placements_data))
     
-    active_placements = [p for p in placements_data if p.get("status") == "Active"]
+    active_placements = [p for p in placements_data if p.get("status") == "Published"]
     col4.metric("Currently Employed", len(active_placements))
     
     retention = round((len(active_placements) / len(placements_data)) * 100) if placements_data else 0
@@ -1047,56 +1047,196 @@ def partner_dashboard():
     if partner_tier == "Impact Partner":
         # Full dashboard for Impact Partners
         
-        # Key Metrics
+        # Custom styling for better layout
+        st.markdown("""
+        <style>
+            .metric-card {
+                background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+                border-radius: 16px;
+                padding: 30px;
+                margin-bottom: 20px;
+                border: 1px solid #e2e8f0;
+            }
+            .metric-value {
+                font-size: 2.5rem;
+                font-weight: 700;
+                color: #0f1c3f;
+                margin-bottom: 5px;
+            }
+            .metric-label {
+                font-size: 1rem;
+                color: #64748b;
+                margin-bottom: 8px;
+            }
+            .metric-subtext {
+                font-size: 0.9rem;
+                color: #22c55e;
+                font-weight: 500;
+            }
+            .section-divider {
+                margin: 40px 0 30px 0;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #e2e8f0;
+                font-size: 1.2rem;
+                font-weight: 600;
+                color: #0f1c3f;
+            }
+            .breakdown-card {
+                background: white;
+                border-radius: 12px;
+                padding: 25px;
+                text-align: center;
+                border: 1px solid #e2e8f0;
+                height: 100%;
+            }
+            .breakdown-value {
+                font-size: 2rem;
+                font-weight: 700;
+                color: #0f1c3f;
+            }
+            .breakdown-label {
+                font-size: 0.85rem;
+                color: #64748b;
+                margin-top: 8px;
+            }
+            .diversity-highlight {
+                background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+                border-radius: 12px;
+                padding: 25px;
+                border-left: 4px solid #22c55e;
+                margin: 15px 0;
+            }
+            .diversity-text {
+                font-size: 1.1rem;
+                color: #166534;
+                font-weight: 500;
+            }
+            .action-item {
+                background: #fffbeb;
+                border-radius: 10px;
+                padding: 15px 20px;
+                margin: 10px 0;
+                border-left: 4px solid #f59e0b;
+            }
+            .quote-card {
+                background: #f8fafc;
+                border-left: 4px solid #0f1c3f;
+                padding: 20px 25px;
+                margin: 15px 0;
+                font-style: italic;
+                color: #475569;
+                border-radius: 0 12px 12px 0;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Key Metrics Row
         col1, col2 = st.columns(2)
         
         with col1:
-            st.metric("Estimated Retention Savings", f"£{metrics['retention_savings']:,.0f}")
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Estimated Retention Savings</div>
+                <div class="metric-value">£{metrics['retention_savings']:,.0f}</div>
+                <div class="metric-subtext">↑ vs industry average</div>
+            </div>
+            """, unsafe_allow_html=True)
         
         with col2:
             diversity = metrics.get("diversity_data", {})
             employees = diversity.get("total_employees", 0)
             countries = diversity.get("countries_represented", 0)
             if employees > 0:
-                st.metric("Diversity Contribution", f"{employees} employees", f"representing {countries} countries")
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-label">Diversity Contribution</div>
+                    <div class="metric-value">{employees} employees</div>
+                    <div class="metric-subtext">representing {countries} countries</div>
+                </div>
+                """, unsafe_allow_html=True)
             else:
-                st.metric("Diversity Contribution", "No data yet")
+                st.markdown("""
+                <div class="metric-card">
+                    <div class="metric-label">Diversity Contribution</div>
+                    <div class="metric-value">—</div>
+                    <div class="metric-subtext">No data yet</div>
+                </div>
+                """, unsafe_allow_html=True)
         
         # Retention Breakdown
-        st.markdown('<p class="section-header">Estimated Retention Savings Breakdown</p>', unsafe_allow_html=True)
+        st.markdown('<div class="section-divider">Estimated Retention Savings Breakdown</div>', unsafe_allow_html=True)
         
         savings_data = metrics.get("retention_savings_data", {})
         if savings_data:
             col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Retention Rate", f"{savings_data.get('ach_retention_percent', 0)}%")
-            col2.metric("Industry Benchmark", f"{savings_data.get('industry_retention_percent', 0)}%")
-            col3.metric("Your Uplift", f"+{savings_data.get('retention_uplift_percent', 0)}%")
-            col4.metric("Estimated Savings", f"£{savings_data.get('total_savings', 0):,.0f}")
+            
+            with col1:
+                st.markdown(f"""
+                <div class="breakdown-card">
+                    <div class="breakdown-value">{savings_data.get('ach_retention_percent', 0)}%</div>
+                    <div class="breakdown-label">Retention Rate</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                <div class="breakdown-card">
+                    <div class="breakdown-value">{savings_data.get('industry_retention_percent', 0)}%</div>
+                    <div class="breakdown-label">Industry Benchmark</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                st.markdown(f"""
+                <div class="breakdown-card">
+                    <div class="breakdown-value" style="color: #22c55e;">+{savings_data.get('retention_uplift_percent', 0)}%</div>
+                    <div class="breakdown-label">Your Uplift</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col4:
+                st.markdown(f"""
+                <div class="breakdown-card">
+                    <div class="breakdown-value">£{savings_data.get('total_savings', 0):,.0f}</div>
+                    <div class="breakdown-label">Estimated Savings</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
             st.caption(savings_data.get('methodology', ''))
         
         # Diversity
-        st.markdown('<p class="section-header">Diversity Contribution</p>', unsafe_allow_html=True)
+        st.markdown('<div class="section-divider">Diversity Contribution</div>', unsafe_allow_html=True)
         
         diversity = metrics.get("diversity_data", {})
         employees = diversity.get("total_employees", 0)
         countries = diversity.get("countries_represented", 0)
         if employees > 0:
-            st.write(f"**{employees} employees with international experience, representing {countries} countries**")
+            st.markdown(f"""
+            <div class="diversity-highlight">
+                <div class="diversity-text">{employees} employees with international experience, representing {countries} countries</div>
+            </div>
+            """, unsafe_allow_html=True)
         else:
             st.info("Diversity data will appear once placements are recorded")
         
         # Pending Reviews
         pending = get_pending_reviews(partner_id)
         if pending:
-            st.markdown('<p class="section-header">Action Required</p>', unsafe_allow_html=True)
+            st.markdown('<div class="section-divider">Action Required</div>', unsafe_allow_html=True)
             for p in pending:
-                st.warning(f"**{p['candidate_name']}** - {p['milestone']} due {p['due_date']}")
+                st.markdown(f"""
+                <div class="action-item">
+                    <strong>{p['candidate_name']}</strong> — {p['milestone']} due {p['due_date']}
+                </div>
+                """, unsafe_allow_html=True)
         
         # Quotes
         if metrics["quotes"]:
-            st.markdown('<p class="section-header">Success Stories</p>', unsafe_allow_html=True)
+            st.markdown('<div class="section-divider">Success Stories</div>', unsafe_allow_html=True)
             for quote in metrics["quotes"][:3]:
-                st.markdown(f'<div class="quote-box">"{quote}"</div>', unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class="quote-card">"{quote}"</div>
+                """, unsafe_allow_html=True)
     
     else:
         # Locked dashboard for Standard partners
