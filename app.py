@@ -1563,8 +1563,10 @@ def partner_dashboard():
             suitability = metrics.get("candidate_suitability")
             if suitability is not None:
                 suitability_text = f"{suitability}%"
+                suitability_bar = f'<div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {suitability}%;"></div></div>'
             else:
                 suitability_text = "No reviews yet"
+                suitability_bar = ""
             
             st.markdown(f"""
             <div class="impact-section">
@@ -1586,7 +1588,7 @@ def partner_dashboard():
                     <span class="impact-metric-name">Candidate Suitability</span>
                     <div style="display: flex; align-items: center;">
                         <span class="impact-metric-value">{suitability_text}</span>
-                        {f'<div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {suitability}%;"></div></div>' if suitability is not None else ''}
+                        {suitability_bar}
                     </div>
                 </div>
                 <div class="impact-row">
