@@ -1563,42 +1563,48 @@ def partner_dashboard():
             suitability = metrics.get("candidate_suitability")
             if suitability is not None:
                 suitability_text = f"{suitability}%"
-                suitability_bar = f'<div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {suitability}%;"></div></div>'
+                suitability_bar_html = '<div class="impact-metric-bar"><div class="impact-metric-fill" style="width: ' + str(suitability) + '%;"></div></div>'
             else:
                 suitability_text = "No reviews yet"
-                suitability_bar = ""
+                suitability_bar_html = ""
             
             retention_bar_width = min(retention_rate, 100)
             
-            business_html = f'''<div class="impact-section">
-                <div class="impact-section-title">Business Impact Received</div>
-                <div class="impact-row">
-                    <span class="impact-metric-name">12-Month Retention</span>
-                    <div style="display: flex; align-items: center;">
-                        <span class="impact-metric-value">{retention_rate}%</span>
-                        <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {retention_bar_width}%;"></div></div>
-                    </div>
-                </div>
-                <div class="impact-row">
-                    <span class="impact-metric-name">Estimated Retention Savings</span>
-                    <div style="display: flex; align-items: center;">
-                        <span class="impact-metric-value">{savings_text}</span>
-                    </div>
-                </div>
-                <div class="impact-row">
-                    <span class="impact-metric-name">Candidate Suitability</span>
-                    <div style="display: flex; align-items: center;">
-                        <span class="impact-metric-value">{suitability_text}</span>
-                        {suitability_bar}
-                    </div>
-                </div>
-                <div class="impact-row">
-                    <span class="impact-metric-name">Diversity Contribution</span>
-                    <div style="display: flex; align-items: center;">
-                        <span class="impact-metric-value">{diversity_text}</span>
-                    </div>
-                </div>
-            </div>'''
+            business_html = '<div class="impact-section">'
+            business_html += '<div class="impact-section-title">Business Impact Received</div>'
+            
+            # Row 1: Retention
+            business_html += '<div class="impact-row">'
+            business_html += '<span class="impact-metric-name">12-Month Retention</span>'
+            business_html += '<div style="display: flex; align-items: center;">'
+            business_html += '<span class="impact-metric-value">' + str(retention_rate) + '%</span>'
+            business_html += '<div class="impact-metric-bar"><div class="impact-metric-fill" style="width: ' + str(retention_bar_width) + '%;"></div></div>'
+            business_html += '</div></div>'
+            
+            # Row 2: Savings
+            business_html += '<div class="impact-row">'
+            business_html += '<span class="impact-metric-name">Estimated Retention Savings</span>'
+            business_html += '<div style="display: flex; align-items: center;">'
+            business_html += '<span class="impact-metric-value">' + savings_text + '</span>'
+            business_html += '</div></div>'
+            
+            # Row 3: Suitability
+            business_html += '<div class="impact-row">'
+            business_html += '<span class="impact-metric-name">Candidate Suitability</span>'
+            business_html += '<div style="display: flex; align-items: center;">'
+            business_html += '<span class="impact-metric-value">' + suitability_text + '</span>'
+            business_html += suitability_bar_html
+            business_html += '</div></div>'
+            
+            # Row 4: Diversity
+            business_html += '<div class="impact-row">'
+            business_html += '<span class="impact-metric-name">Diversity Contribution</span>'
+            business_html += '<div style="display: flex; align-items: center;">'
+            business_html += '<span class="impact-metric-value">' + diversity_text + '</span>'
+            business_html += '</div></div>'
+            
+            business_html += '</div>'
+            
             st.markdown(business_html, unsafe_allow_html=True)
         
         with col2:
@@ -1606,32 +1612,31 @@ def partner_dashboard():
             employer_completed = him_score['social_impact']['employer_completed']
             employee_responses = him_score['social_impact']['employee_responses']
             
-            dimensions_html = ""
+            social_html = '<div class="impact-section">'
+            social_html += '<div class="impact-section-title">Social Impact Created</div>'
+            
             if employer_completed or employee_responses > 0:
                 for dim_name, dim_score in social_dimensions.items():
-                    dimensions_html += f'''<div class="impact-row">
-                        <span class="impact-metric-name">{dim_name}</span>
-                        <div style="display: flex; align-items: center;">
-                            <span class="impact-metric-value">{dim_score}%</span>
-                            <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {dim_score}%;"></div></div>
-                        </div>
-                    </div>'''
+                    social_html += '<div class="impact-row">'
+                    social_html += '<span class="impact-metric-name">' + str(dim_name) + '</span>'
+                    social_html += '<div style="display: flex; align-items: center;">'
+                    social_html += '<span class="impact-metric-value">' + str(dim_score) + '%</span>'
+                    social_html += '<div class="impact-metric-bar"><div class="impact-metric-fill" style="width: ' + str(dim_score) + '%;"></div></div>'
+                    social_html += '</div></div>'
                 
                 # Show data sources
                 sources = []
                 if employer_completed:
                     sources.append("Employer assessment")
                 if employee_responses > 0:
-                    sources.append(f"{employee_responses} employee response(s)")
+                    sources.append(str(employee_responses) + " employee response(s)")
                 source_text = " + ".join(sources)
-                dimensions_html += f'<div style="padding-top: 10px; font-size: 0.8rem; color: #64748b;">Based on: {source_text}</div>'
+                social_html += '<div style="padding-top: 10px; font-size: 0.8rem; color: #64748b;">Based on: ' + source_text + '</div>'
             else:
-                dimensions_html = '<div style="padding: 20px; text-align: center; color: #64748b;">Complete the Holistic Impact Assessment to see your Social Impact scores</div>'
+                social_html += '<div style="padding: 20px; text-align: center; color: #64748b;">Complete the Holistic Impact Assessment to see your Social Impact scores</div>'
             
-            social_html = f'''<div class="impact-section">
-                <div class="impact-section-title">Social Impact Created</div>
-                {dimensions_html}
-            </div>'''
+            social_html += '</div>'
+            
             st.markdown(social_html, unsafe_allow_html=True)
         
         # Retention Breakdown
