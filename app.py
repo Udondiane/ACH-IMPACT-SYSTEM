@@ -1248,179 +1248,147 @@ def partner_inclusion_assessment():
                 st.error(f"Error: {e}")
 
 
-# ============ PARTNER BASELINE ============
-def partner_baseline():
-    st.markdown('<p class="main-header">Baseline Data</p>', unsafe_allow_html=True)
+# ============ PARTNER CANDIDATES (Recruitment + Milestone Review) ============
+def partner_candidates():
+    st.markdown('<p class="main-header">Candidates</p>', unsafe_allow_html=True)
     
     partner_id = st.session_state.get("user_id", 1)
     
-    try:
-        existing = supabase.table("partner_baseline").select("*").eq("partner_id", partner_id).execute()
-        if existing.data:
-            st.write(f"**{len(existing.data)} role(s) configured**")
-            for role in existing.data:
-                st.write(f"- {role['role_title']} (£{role.get('salary', 'N/A'):,})")
-    except:
-        pass
+    tab1, tab2 = st.tabs(["Recruitment", "Milestone Review"])
     
-    st.markdown('<p class="section-header">Add Role</p>', unsafe_allow_html=True)
-    
-    with st.form("add_baseline_role"):
-        role_title = st.text_input("Role Title")
-        salary = st.number_input("Annual Salary (£)", min_value=0, value=22500)
-        difficulty = st.selectbox("Difficulty to Fill", ["Easy", "Moderate", "Hard", "Very Hard"])
+    # ============ RECRUITMENT TAB ============
+    with tab1:
+        st.markdown('<p class="sub-header">Record interview outcomes and new hires</p>', unsafe_allow_html=True)
         
-        submitted = st.form_submit_button("Add Role", use_container_width=True)
-        
-        if submitted and role_title:
-            try:
-                data = {
-                    "partner_id": partner_id,
-                    "role_title": role_title,
-                    "salary": salary,
-                    "difficulty": difficulty,
-                    "created_at": datetime.now().isoformat()
-                }
-                supabase.table("partner_baseline").insert(data).execute()
-                st.success(f"{role_title} added")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error: {e}")
-
-
-# ============ PARTNER INTERVIEW FEEDBACK ============
-def partner_interview_feedback():
-    st.markdown('<p class="main-header">Interview Feedback</p>', unsafe_allow_html=True)
-    
-    partner_id = st.session_state.get("user_id", 1)
-    
-    try:
-        candidates = supabase.table("candidates").select("*").eq("status", "Available").execute()
-        
-        if not candidates.data:
-            st.info("No candidates available")
-            return
-        
-        with st.form("interview_feedback"):
-            candidate = st.selectbox("Candidate", [""] + [c["name"] for c in candidates.data])
-            role = st.text_input("Role Interviewed For")
-            interview_date = st.date_input("Interview Date")
-            hired = st.radio("Offered Position?", ["Yes", "No"], horizontal=True)
+        try:
+            candidates = supabase.table("candidates").select("*").eq("status", "Available").execute()
             
-            if hired == "Yes":
-                standout = st.text_area("What stood out about this candidate?")
-                start_date = st.date_input("Start Date")
-                salary = st.number_input("Confirmed Salary (£)", min_value=0, value=22500)
+            if not candidates.data:
+                st.info("No candidates available for recruitment")
             else:
-                reason = st.selectbox("Reason", ["Skills gap", "Experience gap", "English proficiency", "Not right fit", "Other"])
-            
-            submitted = st.form_submit_button("Submit", use_container_width=True)
-            
-            if submitted and candidate and role:
-                try:
-                    cand_data = next(c for c in candidates.data if c["name"] == candidate)
+                with st.form("recruitment_form"):
+                    candidate = st.selectbox("Candidate *", [""] + [c["name"] for c in candidates.data])
+                    role = st.text_input("Role *")
+                    salary = st.number_input("Annual Salary (£) *", min_value=0, value=22500)
+                    interview_date = st.date_input("Interview Date")
                     
-                    feedback = {
-                        "partner_id": partner_id,
-                        "candidate_id": cand_data["id"],
-                        "candidate_name": candidate,
-                        "role": role,
-                        "interview_date": interview_date.isoformat(),
-                        "hired": hired == "Yes",
-                        "standout_reason": standout if hired == "Yes" else None,
-                        "rejection_reason": reason if hired == "No" else None,
-                        "created_at": datetime.now().isoformat()
-                    }
-                    supabase.table("interview_feedback").insert(feedback).execute()
+                    st.divider()
+                    
+                    hired = st.radio("Offered Position? *", ["Yes", "No"], horizontal=True)
                     
                     if hired == "Yes":
-                        partner = supabase.table("impact_partners").select("name").eq("id", partner_id).execute()
-                        partner_name = partner.data[0]["name"] if partner.data else "Unknown"
-                        
-                        placement = {
-                            "partner_id": partner_id,
-                            "partner_name": partner_name,
-                            "candidate_id": cand_data["id"],
-                            "candidate_name": candidate,
-                            "role": role,
-                            "start_date": start_date.isoformat(),
-                            "salary": salary,
-                            "hourly_rate": round(salary / 52 / 40, 2),
-                            "status": "Draft",
-                            "created_at": datetime.now().isoformat()
-                        }
-                        supabase.table("placements").insert(placement).execute()
-                        supabase.table("candidates").update({"status": "Placed"}).eq("id", cand_data["id"]).execute()
-                        
-                        st.success(f"{candidate} placed successfully")
+                        start_date = st.date_input("Start Date")
+                        standout = st.text_area("What stood out about this candidate?")
                     else:
-                        st.success("Feedback recorded")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
-    except Exception as e:
-        st.error(f"Error: {e}")
-
-
-# ============ PARTNER MILESTONE REVIEW ============
-def partner_milestone_review():
-    st.markdown('<p class="main-header">Milestone Reviews</p>', unsafe_allow_html=True)
+                        reason = st.selectbox("Reason for not hiring", ["Skills gap", "Experience gap", "English proficiency", "Not right fit", "Other"])
+                    
+                    submitted = st.form_submit_button("Submit", use_container_width=True)
+                    
+                    if submitted:
+                        if not candidate or not role:
+                            st.error("Please fill in required fields")
+                        else:
+                            try:
+                                cand_data = next(c for c in candidates.data if c["name"] == candidate)
+                                
+                                feedback = {
+                                    "partner_id": partner_id,
+                                    "candidate_id": cand_data["id"],
+                                    "candidate_name": candidate,
+                                    "role": role,
+                                    "interview_date": interview_date.isoformat(),
+                                    "hired": hired == "Yes",
+                                    "standout_reason": standout if hired == "Yes" else None,
+                                    "rejection_reason": reason if hired == "No" else None,
+                                    "created_at": datetime.now().isoformat()
+                                }
+                                supabase.table("interview_feedback").insert(feedback).execute()
+                                
+                                if hired == "Yes":
+                                    partner = supabase.table("impact_partners").select("name").eq("id", partner_id).execute()
+                                    partner_name = partner.data[0]["name"] if partner.data else "Unknown"
+                                    
+                                    placement = {
+                                        "partner_id": partner_id,
+                                        "partner_name": partner_name,
+                                        "candidate_id": cand_data["id"],
+                                        "candidate_name": candidate,
+                                        "role": role,
+                                        "start_date": start_date.isoformat(),
+                                        "salary": salary,
+                                        "hourly_rate": round(salary / 52 / 40, 2),
+                                        "status": "Draft",
+                                        "created_at": datetime.now().isoformat()
+                                    }
+                                    supabase.table("placements").insert(placement).execute()
+                                    supabase.table("candidates").update({"status": "Placed"}).eq("id", cand_data["id"]).execute()
+                                    
+                                    st.success(f"{candidate} hired successfully - pending ACH review")
+                                else:
+                                    st.success("Feedback recorded")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error: {e}")
+        except Exception as e:
+            st.error(f"Error: {e}")
     
-    partner_id = st.session_state.get("user_id", 1)
-    pending = get_pending_reviews(partner_id)
-    
-    if not pending:
-        st.success("All reviews are up to date")
-        return
-    
-    st.warning(f"{len(pending)} review(s) pending")
-    
-    for review in pending:
-        with st.expander(f"{review['candidate_name']} - {review['milestone']} (Due: {review['due_date']})"):
-            with st.form(f"review_{review['placement_id']}_{review['milestone_month']}"):
-                still_employed = st.radio("Still employed?", ["Yes", "No"], horizontal=True)
-                
-                if still_employed == "Yes":
-                    performance = st.selectbox("Performance", ["Excellent", "Good", "Satisfactory", "Needs Improvement"])
-                    received_training = st.radio("Received training?", ["Yes", "No"], horizontal=True)
-                    progression = st.radio("Any progression?", ["Yes", "No"], horizontal=True)
-                    contribution_quote = st.text_area("Describe their contribution")
-                else:
-                    leaving_reason = st.selectbox("Reason", ["Resigned", "Dismissed", "Redundancy", "Contract ended", "Other"])
-                
-                submitted = st.form_submit_button("Submit", use_container_width=True)
-                
-                if submitted:
-                    try:
-                        data = {
-                            "placement_id": review["placement_id"],
-                            "partner_id": partner_id,
-                            "milestone_month": review["milestone_month"],
-                            "still_employed": still_employed == "Yes",
-                            "performance": performance if still_employed == "Yes" else None,
-                            "received_training": received_training == "Yes" if still_employed == "Yes" else None,
-                            "progression": progression == "Yes" if still_employed == "Yes" else None,
-                            "contribution_quote": contribution_quote if still_employed == "Yes" else None,
-                            "leaving_reason": leaving_reason if still_employed == "No" else None,
-                            "created_at": datetime.now().isoformat()
-                        }
-                        supabase.table("milestone_reviews_partner").insert(data).execute()
+    # ============ MILESTONE REVIEW TAB ============
+    with tab2:
+        st.markdown('<p class="sub-header">Complete milestone reviews for your employees</p>', unsafe_allow_html=True)
+        
+        pending = get_pending_reviews(partner_id)
+        
+        if not pending:
+            st.success("All reviews are up to date")
+        else:
+            st.warning(f"{len(pending)} review(s) pending")
+            
+            for review in pending:
+                with st.expander(f"{review['candidate_name']} - {review['milestone']} (Due: {review['due_date']})"):
+                    with st.form(f"review_{review['placement_id']}_{review['milestone_month']}"):
+                        still_employed = st.radio("Still employed?", ["Yes", "No"], horizontal=True)
                         
-                        placement_update = {
-                            "last_milestone_check": datetime.now().date().isoformat(),
-                            "last_milestone_month": review["milestone_month"]
-                        }
+                        if still_employed == "Yes":
+                            performance = st.selectbox("Performance", ["Excellent", "Good", "Satisfactory", "Needs Improvement"])
+                            received_training = st.radio("Received training?", ["Yes", "No"], horizontal=True)
+                            progression = st.radio("Any progression?", ["Yes", "No"], horizontal=True)
+                            contribution_quote = st.text_area("Describe their contribution")
+                        else:
+                            leaving_reason = st.selectbox("Reason", ["Resigned", "Dismissed", "Redundancy", "Contract ended", "Other"])
                         
-                        if still_employed == "No":
-                            placement_update["status"] = "Left"
-                            placement_update["end_date"] = datetime.now().date().isoformat()
+                        submitted = st.form_submit_button("Submit", use_container_width=True)
                         
-                        supabase.table("placements").update(placement_update).eq("id", review["placement_id"]).execute()
-                        
-                        st.success("Review submitted")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+                        if submitted:
+                            try:
+                                data = {
+                                    "placement_id": review["placement_id"],
+                                    "partner_id": partner_id,
+                                    "milestone_month": review["milestone_month"],
+                                    "still_employed": still_employed == "Yes",
+                                    "performance": performance if still_employed == "Yes" else None,
+                                    "received_training": received_training == "Yes" if still_employed == "Yes" else None,
+                                    "progression": progression == "Yes" if still_employed == "Yes" else None,
+                                    "contribution_quote": contribution_quote if still_employed == "Yes" else None,
+                                    "leaving_reason": leaving_reason if still_employed == "No" else None,
+                                    "created_at": datetime.now().isoformat()
+                                }
+                                supabase.table("milestone_reviews_partner").insert(data).execute()
+                                
+                                placement_update = {
+                                    "last_milestone_check": datetime.now().date().isoformat(),
+                                    "last_milestone_month": review["milestone_month"]
+                                }
+                                
+                                if still_employed == "No":
+                                    placement_update["status"] = "Left"
+                                    placement_update["end_date"] = datetime.now().date().isoformat()
+                                
+                                supabase.table("placements").update(placement_update).eq("id", review["placement_id"]).execute()
+                                
+                                st.success("Review submitted")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error: {e}")
 
 
 # ============ PARTNER REPORTS ============
@@ -1508,9 +1476,7 @@ def main():
             page = st.radio("Navigation", [
                 "Dashboard",
                 "Inclusion Assessment",
-                "Baseline Data",
-                "Interview Feedback",
-                "Milestone Reviews",
+                "Candidates",
                 "Reports"
             ], label_visibility="collapsed")
     
@@ -1527,9 +1493,7 @@ def main():
         pages = {
             "Dashboard": partner_dashboard,
             "Inclusion Assessment": partner_inclusion_assessment,
-            "Baseline Data": partner_baseline,
-            "Interview Feedback": partner_interview_feedback,
-            "Milestone Reviews": partner_milestone_review,
+            "Candidates": partner_candidates,
             "Reports": partner_reports
         }
     
