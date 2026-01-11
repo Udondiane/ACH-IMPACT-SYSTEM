@@ -10,6 +10,108 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 LIVING_WAGE_UK = 12.00
 
+# ============ PARTNER TYPES ============
+PARTNER_TYPES = [
+    "Corporate Partner",
+    "Funder",
+    "Local Council",
+    "Training Provider",
+    "Community Organisation",
+    "NHS Trust",
+    "Other"
+]
+
+# ============ EMPLOYEE RANGES ============
+EMPLOYEE_RANGES = [
+    "1-10",
+    "11-50",
+    "51-100",
+    "101-250",
+    "251-500",
+    "501-1000",
+    "1000+"
+]
+
+# ============ SECTORS (Comprehensive) ============
+SECTORS = [
+    "Accommodation and Food Services",
+    "Administrative and Support Services",
+    "Agriculture, Forestry and Fishing",
+    "Arts, Entertainment and Recreation",
+    "Automotive",
+    "Aviation",
+    "Banking and Finance",
+    "Charity and Non-Profit",
+    "Cleaning Services",
+    "Construction",
+    "Consulting",
+    "Creative and Media",
+    "Defence",
+    "Education - Early Years",
+    "Education - Further Education",
+    "Education - Higher Education",
+    "Education - Primary",
+    "Education - Secondary",
+    "Energy and Utilities",
+    "Engineering",
+    "Environmental Services",
+    "Events and Conferences",
+    "Facilities Management",
+    "Fashion and Textiles",
+    "Financial Services",
+    "Food and Beverage Manufacturing",
+    "Government - Central",
+    "Government - Local",
+    "Healthcare - Dental",
+    "Healthcare - GP/Primary Care",
+    "Healthcare - Hospital/Acute",
+    "Healthcare - Mental Health",
+    "Healthcare - Pharmacy",
+    "Hospitality - Hotels",
+    "Hospitality - Restaurants",
+    "Hospitality - Catering",
+    "Hospitality - Pubs and Bars",
+    "Housing and Property",
+    "Human Resources",
+    "Information Technology",
+    "Insurance",
+    "Legal Services",
+    "Logistics and Distribution",
+    "Manufacturing - General",
+    "Manufacturing - Food",
+    "Manufacturing - Pharmaceutical",
+    "Marketing and Advertising",
+    "Mining and Quarrying",
+    "Performing Arts",
+    "Pharmaceuticals",
+    "Professional Services",
+    "Public Administration",
+    "Real Estate",
+    "Recruitment",
+    "Research and Development",
+    "Retail - Fashion",
+    "Retail - Food and Grocery",
+    "Retail - General",
+    "Retail - Online",
+    "Security Services",
+    "Social Care - Adults",
+    "Social Care - Children",
+    "Social Care - Elderly",
+    "Social Care - Disabilities",
+    "Sports and Fitness",
+    "Telecommunications",
+    "Tourism and Travel",
+    "Transport - Bus and Coach",
+    "Transport - Rail",
+    "Transport - Taxi and Private Hire",
+    "Transport - Freight",
+    "Veterinary",
+    "Warehousing",
+    "Waste Management",
+    "Wholesale",
+    "Other"
+]
+
 # ============ INDUSTRY BENCHMARKS ============
 INDUSTRY_BENCHMARKS = {
     "Healthcare": {"retention_12m": 0.75, "source": "NHS Digital"},
@@ -24,9 +126,219 @@ INDUSTRY_BENCHMARKS = {
     "Other": {"retention_12m": 0.65, "source": "CIPD Labour Market Outlook"},
 }
 
-# ============ INCLUSION CAPABILITY INDEX QUESTIONS ============
+def get_sector_benchmark(sector):
+    """Map detailed sector to benchmark category"""
+    sector_lower = sector.lower() if sector else ""
+    if "healthcare" in sector_lower or "hospital" in sector_lower or "nhs" in sector_lower or "dental" in sector_lower or "pharmacy" in sector_lower:
+        return INDUSTRY_BENCHMARKS["Healthcare"]
+    elif "social care" in sector_lower:
+        return INDUSTRY_BENCHMARKS["Social Care"]
+    elif "hospitality" in sector_lower or "hotel" in sector_lower or "restaurant" in sector_lower or "catering" in sector_lower or "food service" in sector_lower:
+        return INDUSTRY_BENCHMARKS["Hospitality"]
+    elif "retail" in sector_lower:
+        return INDUSTRY_BENCHMARKS["Retail"]
+    elif "manufacturing" in sector_lower:
+        return INDUSTRY_BENCHMARKS["Manufacturing"]
+    elif "logistics" in sector_lower or "warehouse" in sector_lower or "distribution" in sector_lower:
+        return INDUSTRY_BENCHMARKS["Logistics"]
+    elif "government" in sector_lower or "public" in sector_lower or "council" in sector_lower:
+        return INDUSTRY_BENCHMARKS["Public Sector"]
+    elif "education" in sector_lower:
+        return INDUSTRY_BENCHMARKS["Education"]
+    elif "facilities" in sector_lower or "cleaning" in sector_lower:
+        return INDUSTRY_BENCHMARKS["Facilities"]
+    else:
+        return INDUSTRY_BENCHMARKS["Other"]
 
-# ORGANISATION QUESTIONS (Employer completes - all scale 1-5)
+# ============ ALL COUNTRIES ============
+ALL_COUNTRIES = [
+    "", "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan",
+    "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi",
+    "Cambodia", "Cameroon", "Canada", "Cape Verde", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic",
+    "Democratic Republic of the Congo", "Denmark", "Djibouti", "Dominica", "Dominican Republic",
+    "East Timor", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia",
+    "Fiji", "Finland", "France",
+    "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana",
+    "Haiti", "Honduras", "Hungary",
+    "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Ivory Coast",
+    "Jamaica", "Japan", "Jordan",
+    "Kazakhstan", "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan",
+    "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg",
+    "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar",
+    "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway",
+    "Oman",
+    "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal",
+    "Qatar",
+    "Romania", "Russia", "Rwanda",
+    "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria",
+    "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu",
+    "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan",
+    "Vanuatu", "Vatican City", "Venezuela", "Vietnam",
+    "Yemen",
+    "Zambia", "Zimbabwe"
+]
+
+# ============ 7 CAPABILITY DOMAINS ============
+CAPABILITY_DOMAINS = {
+    "employment": {
+        "name": "Employment Capability",
+        "description": "Ability to find, secure and maintain meaningful work",
+        "factors": {
+            "personal": [
+                {"key": "language_proficiency", "question": "How confident are you in describing your work experience in English during an interview?", "type": "scale", "narrative": "Describe a time you used English to manage a work-related task."},
+                {"key": "digital_literacy", "question": "How often do you use the internet for job searching or CV editing?", "type": "scale", "narrative": "Show us how you would find a job listing online."},
+                {"key": "self_efficacy", "question": "I believe I can handle unexpected challenges in a work setting.", "type": "scale", "narrative": "Tell me about something difficult you've overcome recently."},
+                {"key": "career_orientation", "question": "Do you have a specific career goal for the next year?", "type": "yes_no", "narrative": None},
+                {"key": "work_readiness", "question": "How ready do you feel to attend a UK job interview tomorrow?", "type": "scale", "narrative": "What would you do if you had an interview next week?"}
+            ],
+            "social": [
+                {"key": "peer_networks", "question": "How many people do you know who are working in the UK?", "type": "number", "narrative": "Has anyone you know helped you find a job or training?"},
+                {"key": "mentorship", "question": "Do you know someone with a similar background who is working successfully in the UK?", "type": "yes_no", "narrative": "Tell me about a person who inspired your job path."},
+                {"key": "trust_institutions", "question": "I trust my job support agency to act in my best interest.", "type": "scale", "narrative": "Have you ever felt discouraged by a job service provider?"}
+            ],
+            "environmental": [
+                {"key": "right_to_work", "question": "Do you have the legal right to work in the UK?", "type": "yes_no", "narrative": None},
+                {"key": "job_market_access", "question": "Are there job opportunities or job fairs you can physically get to?", "type": "yes_no", "narrative": None},
+                {"key": "credential_recognition", "question": "Do you feel your previous experience is recognised in the UK?", "type": "scale", "narrative": "Tell us if you've had to repeat any past learning or qualifications."},
+                {"key": "workplace_inclusion", "question": "I feel respected and included at work even if I make mistakes.", "type": "scale", "narrative": "Describe how your first days at a new job felt."}
+            ]
+        }
+    },
+    "housing": {
+        "name": "Housing Capability",
+        "description": "Ability to secure and maintain safe, stable housing",
+        "factors": {
+            "personal": [
+                {"key": "housing_rights", "question": "Do you feel confident reading and understanding a UK tenancy agreement?", "type": "scale", "narrative": "What would you do if your landlord raised the rent suddenly?"},
+                {"key": "budgeting", "question": "Can you estimate how much of your monthly income goes to housing?", "type": "yes_no", "narrative": "Tell us about how you manage your rent and household bills."},
+                {"key": "navigating_systems", "question": "Have you contacted a housing service by yourself in the past 6 months?", "type": "yes_no", "narrative": None}
+            ],
+            "social": [
+                {"key": "housing_advice", "question": "Do you know where to go if you are facing housing difficulties?", "type": "yes_no", "narrative": "Tell us about a time you received housing advice."},
+                {"key": "community_support", "question": "If you lost your housing tomorrow, would someone help you temporarily?", "type": "yes_no", "narrative": None}
+            ],
+            "environmental": [
+                {"key": "affordable_housing", "question": "Is there suitable and affordable housing available in your area?", "type": "scale", "narrative": None},
+                {"key": "discrimination", "question": "Have you ever been refused housing because of your nationality or status?", "type": "yes_no", "narrative": None},
+                {"key": "housing_stability", "question": "Do you feel your current home is secure for the next 12 months?", "type": "scale", "narrative": None},
+                {"key": "housing_suitability", "question": "Is your current housing comfortable and appropriate for your household?", "type": "yes_no", "narrative": None}
+            ]
+        }
+    },
+    "education": {
+        "name": "Education and Skills Capability",
+        "description": "Ability to access and benefit from learning opportunities",
+        "factors": {
+            "personal": [
+                {"key": "language_learning", "question": "How confident do you feel understanding lessons taught in English?", "type": "scale", "narrative": "Describe a time you participated in an English-language class."},
+                {"key": "learning_motivation", "question": "How motivated are you to complete your current learning programme?", "type": "scale", "narrative": "What keeps you going when a course becomes difficult?"},
+                {"key": "education_bridging", "question": "Have you had your previous education assessed or translated?", "type": "yes_no", "narrative": "Tell us how your prior education is helping/hindering you now."},
+                {"key": "digital_literacy_edu", "question": "Can you log into and complete tasks on an online learning portal?", "type": "yes_no", "narrative": None}
+            ],
+            "social": [
+                {"key": "family_support", "question": "Do your caregiving responsibilities interfere with your learning?", "type": "yes_no", "narrative": "How does your family support or hinder your studies?"},
+                {"key": "peer_learning", "question": "Do you have someone to help you understand or revise class material?", "type": "yes_no", "narrative": None},
+                {"key": "tutor_support", "question": "Do you feel your teacher understands your learning needs?", "type": "scale", "narrative": "Describe how your teacher helps you learn."}
+            ],
+            "environmental": [
+                {"key": "accessible_learning", "question": "Can you reach your learning centre easily within 45 mins?", "type": "yes_no", "narrative": None},
+                {"key": "course_recognition", "question": "Does your current course lead to a recognised qualification or next step?", "type": "yes_no", "narrative": None},
+                {"key": "affordability", "question": "Did cost prevent you from applying for a course in the last year?", "type": "yes_no", "narrative": None},
+                {"key": "safe_learning", "question": "Do you feel safe and respected in your class environment?", "type": "scale", "narrative": None}
+            ]
+        }
+    },
+    "health": {
+        "name": "Health and Wellbeing Capability",
+        "description": "Ability to achieve and maintain physical and mental health",
+        "factors": {
+            "personal": [
+                {"key": "health_literacy", "question": "Do you know how to register with a GP or make a doctor's appointment?", "type": "yes_no", "narrative": None},
+                {"key": "mental_health_awareness", "question": "Have you received any information about mental health or stress support?", "type": "yes_no", "narrative": "How do you know when you're feeling mentally unwell?"},
+                {"key": "health_confidence", "question": "How confident are you in describing your health problems to a doctor?", "type": "scale", "narrative": None},
+                {"key": "self_care", "question": "Do you have regular routines for rest, nutrition, and exercise?", "type": "yes_no", "narrative": "What helps you feel physically and mentally healthy every week?"}
+            ],
+            "social": [
+                {"key": "trust_healthcare", "question": "Do you feel respected and listened to by your doctor or nurse?", "type": "scale", "narrative": None},
+                {"key": "community_wellbeing", "question": "Do people you know talk openly about stress, emotions or illness?", "type": "yes_no", "narrative": None},
+                {"key": "family_health", "question": "Have family expectations made it harder to take care of your health?", "type": "yes_no", "narrative": None}
+            ],
+            "environmental": [
+                {"key": "healthcare_access", "question": "How easy is it to access a GP or dentist when needed?", "type": "scale", "narrative": None},
+                {"key": "language_services", "question": "Have you received important health information in your language?", "type": "yes_no", "narrative": None},
+                {"key": "holistic_support", "question": "Have you been supported for multiple needs at the same time?", "type": "yes_no", "narrative": "Have you been supported for multiple needs at the same time (e.g. housing and health)?"},
+                {"key": "safe_spaces", "question": "Do you feel emotionally safe when discussing personal issues in services?", "type": "scale", "narrative": "Describe how you feel after a health or counselling appointment."}
+            ]
+        }
+    },
+    "belonging": {
+        "name": "Belonging and Identity Capability",
+        "description": "Ability to maintain identity and feel part of community",
+        "factors": {
+            "personal": [
+                {"key": "self_confidence", "question": "I feel confident speaking my mind even in unfamiliar spaces.", "type": "scale", "narrative": "Tell me about a time you felt proud of something you did or said."},
+                {"key": "cultural_identity", "question": "Do you feel able to express your culture or beliefs openly?", "type": "yes_no", "narrative": "Describe a moment you felt 'yourself' in the UK."},
+                {"key": "psychological_safety", "question": "Do you worry about being judged for how you speak, look, or act?", "type": "yes_no", "narrative": None}
+            ],
+            "social": [
+                {"key": "social_recognition", "question": "Do you feel others see you as a person of worth?", "type": "scale", "narrative": "Has someone ever shown you appreciation that mattered deeply?"},
+                {"key": "role_models", "question": "Can you name someone you relate to who has done well in the UK?", "type": "yes_no", "narrative": "How do their stories influence your thinking about your future?"},
+                {"key": "relational_stability", "question": "How often do you spend time with someone you trust?", "type": "scale", "narrative": "Describe a friendship that helps you feel at home here."}
+            ],
+            "environmental": [
+                {"key": "inclusive_spaces", "question": "Do you feel welcome in community events or spaces like libraries or parks?", "type": "scale", "narrative": None},
+                {"key": "positive_representation", "question": "Have you seen positive images or stories of people like you in UK media or services?", "type": "yes_no", "narrative": None},
+                {"key": "cultural_celebration", "question": "Have you joined or led any cultural celebrations here?", "type": "yes_no", "narrative": None},
+                {"key": "housing_belonging", "question": "Have you moved more than once in the past year?", "type": "yes_no", "narrative": "How does your housing situation affect your sense of home?"}
+            ]
+        }
+    },
+    "participation": {
+        "name": "Social Participation Capability",
+        "description": "Ability to participate in community and civic life",
+        "factors": {
+            "personal": [
+                {"key": "participation_confidence", "question": "I feel confident contributing to group discussions or decisions.", "type": "scale", "narrative": "Describe a time you felt your opinion influenced a group or event."},
+                {"key": "civic_knowledge", "question": "Do you feel you understand how to get involved in local decisions or activities?", "type": "yes_no", "narrative": None},
+                {"key": "volunteering", "question": "Have you volunteered or helped organise a community event in the last year?", "type": "yes_no", "narrative": "Tell me about a time you led or supported a group activity."}
+            ],
+            "social": [
+                {"key": "social_networks", "question": "Do you know someone who helps you connect with social events or groups?", "type": "yes_no", "narrative": None},
+                {"key": "welcomed", "question": "I feel that people in my area want me to take part in activities with them.", "type": "scale", "narrative": None},
+                {"key": "mutual_exchange", "question": "Have you been part of a project or group where people worked together equally?", "type": "yes_no", "narrative": None}
+            ],
+            "environmental": [
+                {"key": "participatory_platforms", "question": "Do you have opportunities in your local area to join community meetings or projects?", "type": "yes_no", "narrative": None},
+                {"key": "supportive_structures", "question": "Are community events in your area inclusive of different backgrounds and languages?", "type": "yes_no", "narrative": None},
+                {"key": "informal_recognition", "question": "Do you feel your informal community contributions are valued?", "type": "yes_no", "narrative": "Describe something informal you've done that helped your community."},
+                {"key": "accessibility", "question": "Do practical issues like transport or language stop you from joining events?", "type": "yes_no", "narrative": None}
+            ]
+        }
+    },
+    "rights": {
+        "name": "Rights and Citizenship Capability",
+        "description": "Ability to understand and exercise legal and civic rights",
+        "factors": {
+            "personal": [
+                {"key": "legal_literacy", "question": "I know where to go if I need legal advice on my immigration status.", "type": "scale", "narrative": "Tell me about a time you had to understand your legal rights in the UK."},
+                {"key": "system_confidence", "question": "I feel confident completing official forms or speaking with government staff.", "type": "scale", "narrative": None},
+                {"key": "civic_empowerment", "question": "Do you feel you are a valued participant in UK society?", "type": "scale", "narrative": "What does it mean to you to be part of UK society?"}
+            ],
+            "social": [
+                {"key": "trust_institutions", "question": "I trust the local council or service providers to help if I need them.", "type": "scale", "narrative": None},
+                {"key": "advocacy_support", "question": "Do you know someone who can help you if you need to deal with official processes?", "type": "yes_no", "narrative": None},
+                {"key": "civic_role_models", "question": "Do you know someone whose path to citizenship or stability inspired you?", "type": "yes_no", "narrative": None}
+            ],
+            "environmental": [
+                {"key": "legal_services", "question": "Do you know where to find legal or rights-based help in your local area?", "type": "yes_no", "narrative": None},
+                {"key": "stable_environment", "question": "Have you ever been confused or set back by unclear rules or sudden changes?", "type": "yes_no", "narrative": None},
+                {"key": "political_participation", "question": "Have you had the opportunity to participate in political or civic activities?", "type": "yes_no", "narrative": "Have you shared your opinion in a public setting in the UK?"}
+            ]
+        }
+    }
+}
+
+# ============ EMPLOYER INCLUSION ASSESSMENT (6 dimensions) ============
 ORGANISATION_QUESTIONS = {
     "economic_security": {
         "name": "Economic Security and Stability",
@@ -37,7 +349,7 @@ ORGANISATION_QUESTIONS = {
     "skill_growth": {
         "name": "Skill Use and Growth",
         "input": "To what extent does the organisation provide access to relevant training and skill development opportunities?",
-        "conversion": "To what extent can refugee employees realistically participate in these learning opportunities (e.g., scheduling, eligibility, support)?",
+        "conversion": "To what extent can refugee employees realistically participate in these learning opportunities?",
         "capability": "To what extent do refugee employees feel they can use their skills and grow professionally in their roles?"
     },
     "dignity_respect": {
@@ -54,291 +366,31 @@ ORGANISATION_QUESTIONS = {
     },
     "belonging_inclusion": {
         "name": "Social Belonging and Inclusion",
-        "input": "To what extent does the organisation provide initiatives to support social connection and inclusion (e.g., buddy schemes, cultural events)?",
+        "input": "To what extent does the organisation provide initiatives to support social connection and inclusion?",
         "conversion": "To what extent do managers and teams actively encourage inclusive interactions in daily work?",
         "capability": "To what extent do refugee employees feel part of the team and socially connected within the organisation?"
     },
     "wellbeing": {
         "name": "Wellbeing and Confidence to Plan Ahead",
-        "input": "To what extent does the organisation provide wellbeing and health support (e.g., rest time, counselling access, workload policy)?",
+        "input": "To what extent does the organisation provide wellbeing and health support?",
         "conversion": "To what extent can refugee employees actually use these wellbeing supports without stigma or barriers?",
         "capability": "To what extent do refugee employees feel safe, healthy, and able to plan their personal and work futures?"
     }
 }
 
-# CANDIDATE QUESTIONS (Employee completes - mix of scale and narrative)
-CANDIDATE_QUESTIONS = {
-    "economic_security": {
-        "name": "Economic Security and Stability",
-        "input": {
-            "type": "narrative",
-            "question": "Can you describe how predictable your work and income feel here? What helps you feel secure - or makes it hard?"
-        },
-        "conversion": {
-            "type": "narrative",
-            "question": "When schedules or pay change, how do you usually find out? How does that make you feel about the stability of your job?"
-        },
-        "capability": {
-            "type": "scale",
-            "question": "Do you feel your income and working hours are reliable enough to plan your life ahead?"
-        }
-    },
-    "skill_growth": {
-        "name": "Skill Use and Growth",
-        "input": {
-            "type": "narrative",
-            "question": "What kinds of learning or training opportunities do you know about here?"
-        },
-        "conversion": {
-            "type": "narrative",
-            "question": "Can you share a time you wanted to join training or learn new skills - what helped or stopped you?"
-        },
-        "capability": {
-            "type": "narrative",
-            "question": "Can you describe a moment when you were able to use your abilities fully at work?"
-        }
-    },
-    "dignity_respect": {
-        "name": "Workplace Dignity and Respect",
-        "input": {
-            "type": "narrative",
-            "question": "Have you been told about policies that protect fairness or respect at work?"
-        },
-        "conversion": {
-            "type": "narrative",
-            "question": "How are you usually treated by colleagues or supervisors? Can you recall a time that made you feel respected - or not?"
-        },
-        "capability": {
-            "type": "scale",
-            "question": "Do you feel respected and valued as a person here?"
-        }
-    },
-    "voice_agency": {
-        "name": "Voice and Agency",
-        "input": {
-            "type": "narrative",
-            "question": "Are there ways for you to share your opinions or issues with management?"
-        },
-        "conversion": {
-            "type": "narrative",
-            "question": "Can you tell me about a time when you spoke up about something at work? What happened afterwards?"
-        },
-        "capability": {
-            "type": "scale",
-            "question": "Do you feel you can make choices or influence how your work is done?"
-        }
-    },
-    "belonging_inclusion": {
-        "name": "Social Belonging and Inclusion",
-        "input": {
-            "type": "narrative",
-            "question": "When you first joined, were there any activities that helped you meet people or feel included?"
-        },
-        "conversion": {
-            "type": "narrative",
-            "question": "Can you describe how your team works together day to day? Do you feel comfortable joining conversations?"
-        },
-        "capability": {
-            "type": "narrative",
-            "question": "What makes you feel you belong here - or sometimes, what makes you feel apart?"
-        }
-    },
-    "wellbeing": {
-        "name": "Wellbeing and Confidence to Plan Ahead",
-        "input": {
-            "type": "narrative",
-            "question": "What kinds of wellbeing or health support are available to you here?"
-        },
-        "conversion": {
-            "type": "narrative",
-            "question": "If you need time off or help for health reasons, how easy is it to ask for and receive support?"
-        },
-        "capability": {
-            "type": "scale",
-            "question": "Do you feel safe and confident about your future here?"
-        }
-    }
-}
-
-# Score bands for Inclusion Capability Index
+# Score bands for assessments
 SCORE_BANDS = [
-    {"min": 0, "max": 40, "label": "Foundational", "description": "Basic structures missing or not yet established"},
-    {"min": 41, "max": 60, "label": "Developing", "description": "Policies exist but gaps remain in practice"},
-    {"min": 61, "max": 80, "label": "Established", "description": "Good practice with some areas to strengthen"},
-    {"min": 81, "max": 100, "label": "Leading", "description": "Strong inclusion capability across all areas"}
+    {"min": 0, "max": 40, "label": "Foundational", "description": "Basic structures need development"},
+    {"min": 41, "max": 60, "label": "Developing", "description": "Progress made, gaps remain"},
+    {"min": 61, "max": 80, "label": "Established", "description": "Good practice, some areas to strengthen"},
+    {"min": 81, "max": 100, "label": "Leading", "description": "Strong capability across all areas"}
 ]
-
 
 def get_score_band(score):
     for band in SCORE_BANDS:
         if band["min"] <= score <= band["max"]:
             return band
     return SCORE_BANDS[0]
-
-
-# ============ REPLACEMENT COST MULTIPLIERS ============
-def get_replacement_multiplier(salary):
-    if salary < 24000:
-        return 0.15
-    elif salary < 28000:
-        return 0.18
-    elif salary < 35000:
-        return 0.22
-    elif salary < 45000:
-        return 0.25
-    else:
-        return 0.30
-
-
-def calculate_retention_savings(placements, sector, ach_retention_rate):
-    benchmark_data = INDUSTRY_BENCHMARKS.get(sector, INDUSTRY_BENCHMARKS["Other"])
-    industry_retention = benchmark_data["retention_12m"]
-    benchmark_source = benchmark_data["source"]
-    
-    retention_uplift = max(0, ach_retention_rate - industry_retention)
-    
-    total_savings = 0
-    
-    for p in placements:
-        salary = p.get("salary") or 0
-        if salary > 0:
-            multiplier = get_replacement_multiplier(salary)
-            replacement_cost = salary * multiplier
-            savings = retention_uplift * replacement_cost
-            total_savings += savings
-    
-    return {
-        "total_savings": round(total_savings, 2),
-        "ach_retention_percent": round(ach_retention_rate * 100, 1),
-        "industry_retention_percent": round(industry_retention * 100, 1),
-        "retention_uplift_percent": round(retention_uplift * 100, 1),
-        "sector": sector,
-        "benchmark_source": benchmark_source,
-        "methodology": f"Based on {benchmark_source} ({round(industry_retention * 100)}% industry retention) and CIPD replacement cost estimates."
-    }
-
-
-def calculate_diversity_contribution(placements, candidates_data):
-    """
-    Calculate diversity contribution by country of origin.
-    Only counts non-UK countries.
-    """
-    country_counts = {}
-    
-    for p in placements:
-        candidate_id = p.get("candidate_id")
-        if candidate_id and candidate_id in candidates_data:
-            country = candidates_data[candidate_id].get("country_of_origin", "Unknown")
-            # Only count non-UK countries
-            if country and country not in ["United Kingdom", "UK", "England", "Scotland", "Wales", "Northern Ireland", "Unknown", ""]:
-                country_counts[country] = country_counts.get(country, 0) + 1
-    
-    sorted_countries = sorted(country_counts.items(), key=lambda x: x[1], reverse=True)
-    
-    return {
-        "total_employees": sum(country_counts.values()),
-        "countries_represented": len(country_counts),
-        "breakdown": sorted_countries
-    }
-
-
-def calculate_inclusion_index(org_scores, candidate_scores):
-    """
-    Calculate the Inclusion Capability Index from organisation and candidate responses.
-    
-    org_scores: dict of dimension -> {input: 1-5, conversion: 1-5, capability: 1-5}
-    candidate_scores: dict of dimension -> {input: 1-5 or None, conversion: 1-5 or None, capability: 1-5 or None}
-    
-    Returns overall score (0-100) and dimension breakdown
-    """
-    dimensions = ["economic_security", "skill_growth", "dignity_respect", "voice_agency", "belonging_inclusion", "wellbeing"]
-    
-    dimension_scores = {}
-    total_org_score = 0
-    total_candidate_score = 0
-    total_org_max = 0
-    total_candidate_max = 0
-    
-    for dim in dimensions:
-        org_dim = org_scores.get(dim, {})
-        cand_dim = candidate_scores.get(dim, {})
-        
-        # Organisation scores (all are 1-5 scale)
-        org_input = org_dim.get("input", 0)
-        org_conversion = org_dim.get("conversion", 0)
-        org_capability = org_dim.get("capability", 0)
-        org_total = org_input + org_conversion + org_capability
-        org_max = 15
-        
-        # Candidate scores (only scale questions counted)
-        cand_input = cand_dim.get("input", 0) if cand_dim.get("input") else 0
-        cand_conversion = cand_dim.get("conversion", 0) if cand_dim.get("conversion") else 0
-        cand_capability = cand_dim.get("capability", 0) if cand_dim.get("capability") else 0
-        
-        # Count how many scale questions exist for this dimension
-        cand_scale_count = 0
-        cand_total = 0
-        if CANDIDATE_QUESTIONS[dim]["input"]["type"] == "scale" and cand_input:
-            cand_total += cand_input
-            cand_scale_count += 1
-        if CANDIDATE_QUESTIONS[dim]["conversion"]["type"] == "scale" and cand_conversion:
-            cand_total += cand_conversion
-            cand_scale_count += 1
-        if CANDIDATE_QUESTIONS[dim]["capability"]["type"] == "scale" and cand_capability:
-            cand_total += cand_capability
-            cand_scale_count += 1
-        
-        cand_max = cand_scale_count * 5
-        
-        # Calculate dimension score
-        dim_total = org_total + cand_total
-        dim_max = org_max + cand_max if cand_max > 0 else org_max
-        dim_percent = round((dim_total / dim_max) * 100) if dim_max > 0 else 0
-        
-        # Gap analysis
-        org_percent = round((org_total / org_max) * 100) if org_max > 0 else 0
-        cand_percent = round((cand_total / cand_max) * 100) if cand_max > 0 else 0
-        gap = org_percent - cand_percent if cand_max > 0 else 0
-        
-        dimension_scores[dim] = {
-            "name": ORGANISATION_QUESTIONS[dim]["name"],
-            "org_score": org_total,
-            "org_max": org_max,
-            "org_percent": org_percent,
-            "candidate_score": cand_total,
-            "candidate_max": cand_max,
-            "candidate_percent": cand_percent,
-            "total_score": dim_total,
-            "total_max": dim_max,
-            "percent": dim_percent,
-            "gap": gap
-        }
-        
-        total_org_score += org_total
-        total_candidate_score += cand_total
-        total_org_max += org_max
-        total_candidate_max += cand_max
-    
-    # Overall score
-    overall_total = total_org_score + total_candidate_score
-    overall_max = total_org_max + total_candidate_max if total_candidate_max > 0 else total_org_max
-    overall_percent = round((overall_total / overall_max) * 100) if overall_max > 0 else 0
-    
-    band = get_score_band(overall_percent)
-    
-    return {
-        "overall_score": overall_percent,
-        "overall_total": overall_total,
-        "overall_max": overall_max,
-        "band_label": band["label"],
-        "band_description": band["description"],
-        "dimensions": dimension_scores,
-        "org_total": total_org_score,
-        "org_max": total_org_max,
-        "candidate_total": total_candidate_score,
-        "candidate_max": total_candidate_max
-    }
-
 
 # ============ DATABASE CONNECTION ============
 @st.cache_resource
@@ -360,15 +412,14 @@ st.markdown("""
 <style>
     .main-header { font-size: 2rem; font-weight: 600; color: #0f1c3f; margin-bottom: 0.5rem; }
     .sub-header { font-size: 1rem; color: #64748b; margin-bottom: 2rem; }
-    .quote-box { background: #f8fafc; border-left: 4px solid #0f1c3f; padding: 16px 20px; margin: 16px 0; font-style: italic; color: #475569; }
     .section-header { font-size: 1.3rem; color: #0f1c3f; margin: 2rem 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #e2e8f0; }
+    .metric-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 20px; color: white; margin: 10px 0; }
+    .quote-box { background: #f8fafc; border-left: 4px solid #0f1c3f; padding: 16px 20px; margin: 16px 0; font-style: italic; color: #475569; }
+    .stat-box { background: #f1f5f9; border-radius: 8px; padding: 15px; text-align: center; }
+    .stat-number { font-size: 2rem; font-weight: 700; color: #0f1c3f; }
+    .stat-label { font-size: 0.85rem; color: #64748b; }
     div[data-testid="stSidebar"] { background: linear-gradient(180deg, #0f1c3f 0%, #1a2d5a 100%); }
     div[data-testid="stSidebar"] .stMarkdown { color: white; }
-    .score-card { background: #f8fafc; border-radius: 8px; padding: 20px; margin: 10px 0; }
-    .score-large { font-size: 3rem; font-weight: 700; color: #0f1c3f; }
-    .score-label { font-size: 0.9rem; color: #64748b; }
-    .gap-positive { color: #dc2626; }
-    .gap-negative { color: #16a34a; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -379,21 +430,61 @@ if 'user_id' not in st.session_state:
     st.session_state.user_id = 1
 if 'user_name' not in st.session_state:
     st.session_state.user_name = "ACH Administrator"
-if 'partner_id' not in st.session_state:
-    st.session_state.partner_id = None
-
-# ============ COUNTRY FLAGS ============
-COUNTRY_FLAGS = {
-    "Afghanistan": "AF", "Syria": "SY", "Sudan": "SD", "South Sudan": "SS",
-    "Ukraine": "UA", "Eritrea": "ER", "Iran": "IR", "Iraq": "IQ",
-    "Somalia": "SO", "Yemen": "YE", "Ethiopia": "ET", "Congo": "CD",
-    "Myanmar": "MM", "Pakistan": "PK", "Bangladesh": "BD", "Nigeria": "NG",
-}
-
-def get_country_code(country):
-    return COUNTRY_FLAGS.get(country, "")
 
 # ============ HELPER FUNCTIONS ============
+def get_replacement_multiplier(salary):
+    if salary < 24000:
+        return 0.15
+    elif salary < 28000:
+        return 0.18
+    elif salary < 35000:
+        return 0.22
+    elif salary < 45000:
+        return 0.25
+    else:
+        return 0.30
+
+def calculate_retention_savings(placements, sector, ach_retention_rate):
+    benchmark_data = get_sector_benchmark(sector)
+    industry_retention = benchmark_data["retention_12m"]
+    benchmark_source = benchmark_data["source"]
+    
+    retention_uplift = max(0, ach_retention_rate - industry_retention)
+    total_savings = 0
+    
+    for p in placements:
+        salary = p.get("salary") or 0
+        if salary > 0:
+            multiplier = get_replacement_multiplier(salary)
+            replacement_cost = salary * multiplier
+            savings = retention_uplift * replacement_cost
+            total_savings += savings
+    
+    return {
+        "total_savings": round(total_savings, 2),
+        "ach_retention_percent": round(ach_retention_rate * 100, 1),
+        "industry_retention_percent": round(industry_retention * 100, 1),
+        "retention_uplift_percent": round(retention_uplift * 100, 1),
+        "benchmark_source": benchmark_source,
+        "methodology": f"Based on {benchmark_source} ({round(industry_retention * 100)}% industry retention) and CIPD replacement cost estimates."
+    }
+
+def calculate_diversity_contribution(placements, candidates_data):
+    country_counts = {}
+    for p in placements:
+        candidate_id = p.get("candidate_id")
+        if candidate_id and candidate_id in candidates_data:
+            country = candidates_data[candidate_id].get("country_of_origin", "Unknown")
+            if country and country not in ["United Kingdom", "UK", "England", "Scotland", "Wales", "Northern Ireland", "Unknown", ""]:
+                country_counts[country] = country_counts.get(country, 0) + 1
+    
+    sorted_countries = sorted(country_counts.items(), key=lambda x: x[1], reverse=True)
+    return {
+        "total_employees": sum(country_counts.values()),
+        "countries_represented": len(country_counts),
+        "breakdown": sorted_countries
+    }
+
 def get_partner_sector(partner_id):
     try:
         result = supabase.table("impact_partners").select("sector").eq("id", partner_id).execute()
@@ -402,7 +493,6 @@ def get_partner_sector(partner_id):
     except:
         pass
     return "Other"
-
 
 def calculate_impact_metrics(partner_id):
     sector = get_partner_sector(partner_id)
@@ -414,14 +504,11 @@ def calculate_impact_metrics(partner_id):
         "retention_savings": 0,
         "retention_savings_data": {},
         "diversity_data": {},
-        "inclusion_index": 0,
-        "inclusion_data": {},
-        "progression_rate": 0,
+        "avg_tenure_months": 0,
         "living_wage_percent": 0,
-        "quotes": [],
-        "candidate_quotes": [],
         "progression_count": 0,
         "training_count": 0,
+        "quotes": [],
         "sector": sector
     }
     
@@ -434,7 +521,6 @@ def calculate_impact_metrics(partner_id):
             active = [p for p in placements if p.get("status") == "Active"]
             metrics["active_employees"] = len(active)
             
-            # Calculate average tenure for active employees
             if active:
                 total_months = 0
                 for p in active:
@@ -443,13 +529,10 @@ def calculate_impact_metrics(partner_id):
                         months = (datetime.now() - start).days / 30
                         total_months += months
                 metrics["avg_tenure_months"] = round(total_months / len(active), 1)
-            else:
-                metrics["avg_tenure_months"] = 0
             
             if metrics["total_placements"] > 0:
                 metrics["retention_rate"] = round((len(active) / metrics["total_placements"]) * 100)
                 ach_retention_decimal = len(active) / metrics["total_placements"]
-                
                 savings_data = calculate_retention_savings(placements, sector, ach_retention_decimal)
                 metrics["retention_savings"] = savings_data["total_savings"]
                 metrics["retention_savings_data"] = savings_data
@@ -468,66 +551,16 @@ def calculate_impact_metrics(partner_id):
     except:
         pass
     
-    # Get Inclusion Capability Index
-    try:
-        org_assessment = supabase.table("inclusion_assessment_org").select("*").eq("partner_id", partner_id).order("created_at", desc=True).limit(1).execute()
-        candidate_assessments = supabase.table("inclusion_assessment_candidate").select("*").eq("partner_id", partner_id).execute()
-        
-        if org_assessment.data:
-            org_scores = org_assessment.data[0].get("scores", {})
-            
-            # Average candidate scores if multiple
-            candidate_scores = {}
-            if candidate_assessments.data:
-                for dim in CANDIDATE_QUESTIONS.keys():
-                    dim_scores = {"input": [], "conversion": [], "capability": []}
-                    for ca in candidate_assessments.data:
-                        ca_scores = ca.get("scores", {}).get(dim, {})
-                        for layer in ["input", "conversion", "capability"]:
-                            if ca_scores.get(layer) and CANDIDATE_QUESTIONS[dim][layer]["type"] == "scale":
-                                dim_scores[layer].append(ca_scores[layer])
-                    
-                    candidate_scores[dim] = {
-                        "input": round(sum(dim_scores["input"]) / len(dim_scores["input"])) if dim_scores["input"] else 0,
-                        "conversion": round(sum(dim_scores["conversion"]) / len(dim_scores["conversion"])) if dim_scores["conversion"] else 0,
-                        "capability": round(sum(dim_scores["capability"]) / len(dim_scores["capability"])) if dim_scores["capability"] else 0
-                    }
-            
-            inclusion_data = calculate_inclusion_index(org_scores, candidate_scores)
-            metrics["inclusion_index"] = inclusion_data["overall_score"]
-            metrics["inclusion_data"] = inclusion_data
-    except:
-        pass
-    
-    try:
-        feedback = supabase.table("interview_feedback").select("*").eq("partner_id", partner_id).eq("hired", True).execute()
-        if feedback.data:
-            metrics["quotes"] = [f.get("standout_reason") for f in feedback.data if f.get("standout_reason")]
-    except:
-        pass
-    
     try:
         reviews = supabase.table("milestone_reviews_partner").select("*").eq("partner_id", partner_id).execute()
         if reviews.data:
-            metrics["quotes"].extend([r.get("contribution_quote") for r in reviews.data if r.get("contribution_quote")])
+            metrics["quotes"] = [r.get("contribution_quote") for r in reviews.data if r.get("contribution_quote")]
             metrics["progression_count"] = sum(1 for r in reviews.data if r.get("progression"))
             metrics["training_count"] = sum(1 for r in reviews.data if r.get("received_training"))
-            if metrics["total_placements"] > 0:
-                metrics["progression_rate"] = round((metrics["progression_count"] / metrics["total_placements"]) * 100)
-    except:
-        pass
-    
-    try:
-        if placements:
-            for p in placements:
-                cand_reviews = supabase.table("milestone_reviews_candidate").select("*").eq("placement_id", p["id"]).execute()
-                if cand_reviews.data:
-                    metrics["candidate_quotes"].extend([cr.get("improvement_quote") for cr in cand_reviews.data if cr.get("improvement_quote")])
     except:
         pass
     
     return metrics
-
 
 def get_pending_reviews(partner_id):
     pending = []
@@ -554,421 +587,148 @@ def get_pending_reviews(partner_id):
     return pending
 
 
-# ============ PARTNER DASHBOARD ============
-def partner_dashboard():
-    st.markdown('<p class="main-header">Your Impact Dashboard</p>', unsafe_allow_html=True)
-    
-    partner_id = st.session_state.get("user_id", 1)
-    metrics = calculate_impact_metrics(partner_id)
-    
-    # KEY METRICS
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("Retention Savings", f"£{metrics['retention_savings']:,.0f}", f"vs {metrics['sector']} avg")
-    
-    with col2:
-        diversity = metrics.get("diversity_data", {})
-        st.metric("Diversity Contribution", f"{diversity.get('countries_represented', 0)} countries", f"{diversity.get('total_employees', 0)} employees")
-    
-    with col3:
-        inclusion = metrics.get("inclusion_data", {})
-        if inclusion:
-            st.metric("Inclusion Capability Index", f"{inclusion.get('overall_score', 0)}/100", inclusion.get('band_label', ''))
-        else:
-            st.metric("Inclusion Capability Index", "Not assessed", "Complete assessment")
-    
-    # RETENTION BREAKDOWN
-    st.markdown('<p class="section-header">Retention Savings Breakdown</p>', unsafe_allow_html=True)
-    
-    savings_data = metrics.get("retention_savings_data", {})
-    if savings_data:
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Your Retention", f"{savings_data.get('ach_retention_percent', 0)}%")
-        col2.metric("Industry Benchmark", f"{savings_data.get('industry_retention_percent', 0)}%")
-        col3.metric("Your Uplift", f"+{savings_data.get('retention_uplift_percent', 0)}%")
-        col4.metric("Total Savings", f"£{savings_data.get('total_savings', 0):,.0f}")
-        st.caption(savings_data.get('methodology', ''))
-    
-    # INCLUSION INDEX BREAKDOWN
-    inclusion_data = metrics.get("inclusion_data", {})
-    if inclusion_data and inclusion_data.get("dimensions"):
-        st.markdown('<p class="section-header">Inclusion Capability Breakdown</p>', unsafe_allow_html=True)
-        
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
-            st.markdown(f'<div class="score-card"><span class="score-large">{inclusion_data.get("overall_score", 0)}</span><br/><span class="score-label">{inclusion_data.get("band_label", "")} - {inclusion_data.get("band_description", "")}</span></div>', unsafe_allow_html=True)
-        
-        with col2:
-            dims = inclusion_data.get("dimensions", {})
-            for dim_key, dim_data in dims.items():
-                col_a, col_b, col_c = st.columns([2, 1, 1])
-                with col_a:
-                    st.write(f"**{dim_data['name']}**")
-                with col_b:
-                    st.write(f"{dim_data['percent']}%")
-                with col_c:
-                    gap = dim_data.get('gap', 0)
-                    if gap > 10:
-                        st.write(f"Gap: +{gap}")
-                    elif gap < -10:
-                        st.write(f"Gap: {gap}")
-                    else:
-                        st.write("Aligned")
-    
-    # DIVERSITY BREAKDOWN
-    st.markdown('<p class="section-header">Diversity Contribution</p>', unsafe_allow_html=True)
-    
-    diversity = metrics.get("diversity_data", {})
-    if diversity.get("total_employees", 0) > 0:
-        col1, col2 = st.columns(2)
-        col1.metric("Countries Represented", diversity.get("countries_represented", 0))
-        col2.metric("Employees from Global Talent Pool", diversity.get("total_employees", 0))
-    else:
-        st.info("Diversity data will appear once placements are recorded.")
-    
-    # ADDITIONAL METRICS
-    st.markdown('<p class="section-header">Additional Metrics</p>', unsafe_allow_html=True)
-    
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("People Employed", metrics["active_employees"], f"of {metrics['total_placements']}")
-    col2.metric("Retention Rate", f"{metrics['retention_rate']}%")
-    col3.metric("Avg Tenure", f"{metrics.get('avg_tenure_months', 0)} months")
-    col4.metric("Living Wage", f"{metrics['living_wage_percent']}%")
-    col5.metric("Progressions", metrics["progression_count"])
-    
-    # PENDING REVIEWS
-    pending = get_pending_reviews(partner_id)
-    if pending:
-        st.markdown('<p class="section-header">Action Required</p>', unsafe_allow_html=True)
-        for p in pending:
-            st.warning(f"**{p['candidate_name']}** - {p['milestone']} due {p['due_date']}")
-    
-    # QUOTES
-    if metrics["quotes"]:
-        st.markdown('<p class="section-header">Success Stories</p>', unsafe_allow_html=True)
-        for quote in metrics["quotes"][:3]:
-            st.markdown(f'<div class="quote-box">"{quote}"</div>', unsafe_allow_html=True)
-
-
-# ============ INCLUSION ASSESSMENT - ORGANISATION ============
-def partner_inclusion_assessment():
-    st.markdown('<p class="main-header">Inclusion Capability Assessment</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Rate your organisation across six dimensions of inclusive employment</p>', unsafe_allow_html=True)
-    
-    partner_id = st.session_state.get("user_id", 1)
-    
-    # Check for existing assessment
-    try:
-        existing = supabase.table("inclusion_assessment_org").select("*").eq("partner_id", partner_id).order("created_at", desc=True).limit(1).execute()
-        if existing.data:
-            last_date = existing.data[0].get("created_at", "")[:10]
-            st.info(f"Last assessment completed: {last_date}. You can submit a new assessment below.")
-    except:
-        pass
-    
-    with st.form("org_inclusion_assessment"):
-        scores = {}
-        
-        for dim_key, dim_data in ORGANISATION_QUESTIONS.items():
-            st.markdown(f"### {dim_data['name']}")
-            
-            scores[dim_key] = {}
-            
-            st.markdown("**Input (Policies and Structures)**")
-            scores[dim_key]["input"] = st.slider(
-                dim_data["input"],
-                min_value=1, max_value=5, value=3,
-                help="1 = Not at all, 5 = To a great extent",
-                key=f"{dim_key}_input"
-            )
-            
-            st.markdown("**Conversion (Implementation in Practice)**")
-            scores[dim_key]["conversion"] = st.slider(
-                dim_data["conversion"],
-                min_value=1, max_value=5, value=3,
-                help="1 = Not at all, 5 = To a great extent",
-                key=f"{dim_key}_conversion"
-            )
-            
-            st.markdown("**Capability (Employee Experience)**")
-            scores[dim_key]["capability"] = st.slider(
-                dim_data["capability"],
-                min_value=1, max_value=5, value=3,
-                help="1 = Not at all, 5 = To a great extent",
-                key=f"{dim_key}_capability"
-            )
-            
-            st.divider()
-        
-        submitted = st.form_submit_button("Submit Assessment", use_container_width=True)
-        
-        if submitted:
-            try:
-                data = {
-                    "partner_id": partner_id,
-                    "scores": scores,
-                    "created_at": datetime.now().isoformat()
-                }
-                supabase.table("inclusion_assessment_org").insert(data).execute()
-                st.success("Assessment submitted successfully")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error saving assessment: {e}")
-
-
 # ============ ACH DASHBOARD ============
 def ach_dashboard():
-    st.markdown('<p class="main-header">Impact Intelligence Dashboard</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-header">ACH Impact Intelligence Dashboard</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Overview of refugee employment outcomes and partner engagement</p>', unsafe_allow_html=True)
     
+    # Fetch all data
     try:
         partners = supabase.table("impact_partners").select("*").execute()
         candidates = supabase.table("candidates").select("*").execute()
         placements = supabase.table("placements").select("*").execute()
-        
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Partners", len(partners.data) if partners.data else 0)
-        col2.metric("Candidates", len(candidates.data) if candidates.data else 0)
-        col3.metric("Placements", len(placements.data) if placements.data else 0)
-        
-        if placements.data:
-            active = len([p for p in placements.data if p.get("status") == "Active"])
-            retention = round((active / len(placements.data)) * 100) if placements.data else 0
-            col4.metric("Retention", f"{retention}%")
-        
-        # Partner list
-        st.markdown('<p class="section-header">Partner Organisations</p>', unsafe_allow_html=True)
-        
-        if partners.data:
-            for p in partners.data:
-                partner_placements = [pl for pl in placements.data if pl.get("partner_id") == p["id"]] if placements.data else []
-                active = len([pl for pl in partner_placements if pl.get("status") == "Active"])
-                total = len(partner_placements)
-                retention = round((active / total) * 100) if total > 0 else 0
-                
-                with st.expander(f"{p['name']} - {p.get('sector', 'N/A')} - {total} placements"):
-                    col1, col2, col3 = st.columns(3)
-                    col1.write(f"**Placements:** {total}")
-                    col2.write(f"**Active:** {active}")
-                    col3.write(f"**Retention:** {retention}%")
-    except Exception as e:
-        st.error(f"Error: {e}")
-
-
-# ============ ACH EMPLOYEE EXPERIENCE SURVEY (Scale Questions) ============
-def ach_employee_experience_survey():
-    st.markdown('<p class="main-header">Employee Experience Survey</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Quick pulse check - 6 scale questions (2 mins)</p>', unsafe_allow_html=True)
+        reviews = supabase.table("milestone_reviews_partner").select("*").execute()
+    except:
+        partners = type('obj', (object,), {'data': []})()
+        candidates = type('obj', (object,), {'data': []})()
+        placements = type('obj', (object,), {'data': []})()
+        reviews = type('obj', (object,), {'data': []})()
     
-    try:
-        placements = supabase.table("placements").select("*").eq("status", "Active").execute()
-        
-        if not placements.data:
-            st.info("No active placements to survey.")
-            return
-        
-        placement_options = {f"{p['candidate_name']} ({p.get('partner_name', 'Unknown')})": p for p in placements.data}
-        selected = st.selectbox("Select Employee", [""] + list(placement_options.keys()))
-        
-        if selected:
-            placement = placement_options[selected]
-            partner_id = placement.get("partner_id")
-            
-            with st.form("employee_experience_survey"):
-                st.markdown("Rate each statement from 1 (Strongly Disagree) to 5 (Strongly Agree)")
-                
-                scores = {}
-                
-                # Economic Security - Capability
-                scores["economic_security"] = st.slider(
-                    "Do you feel your income and working hours are reliable enough to plan your life ahead?",
-                    min_value=1, max_value=5, value=3,
-                    key="exp_economic"
-                )
-                
-                # Dignity & Respect - Capability
-                scores["dignity_respect"] = st.slider(
-                    "Do you feel respected and valued as a person here?",
-                    min_value=1, max_value=5, value=3,
-                    key="exp_dignity"
-                )
-                
-                # Voice & Agency - Capability
-                scores["voice_agency"] = st.slider(
-                    "Do you feel you can make choices or influence how your work is done?",
-                    min_value=1, max_value=5, value=3,
-                    key="exp_voice"
-                )
-                
-                # Wellbeing - Capability
-                scores["wellbeing"] = st.slider(
-                    "Do you feel safe and confident about your future here?",
-                    min_value=1, max_value=5, value=3,
-                    key="exp_wellbeing"
-                )
-                
-                # Skill Growth - Capability (added for completeness)
-                scores["skill_growth"] = st.slider(
-                    "Do you feel you can use your skills and grow professionally in your role?",
-                    min_value=1, max_value=5, value=3,
-                    key="exp_skill"
-                )
-                
-                # Belonging - Capability (added for completeness)
-                scores["belonging_inclusion"] = st.slider(
-                    "Do you feel part of the team and socially connected here?",
-                    min_value=1, max_value=5, value=3,
-                    key="exp_belonging"
-                )
-                
-                submitted = st.form_submit_button("Submit Survey", use_container_width=True)
-                
-                if submitted:
-                    try:
-                        data = {
-                            "partner_id": partner_id,
-                            "placement_id": placement["id"],
-                            "candidate_name": placement["candidate_name"],
-                            "survey_type": "experience",
-                            "scores": scores,
-                            "created_at": datetime.now().isoformat()
-                        }
-                        supabase.table("inclusion_assessment_candidate").insert(data).execute()
-                        st.success("Survey submitted successfully")
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-    except Exception as e:
-        st.error(f"Error: {e}")
-
-
-# ============ ACH EMPLOYEE VOICE INTERVIEW (Narrative Questions) ============
-def ach_employee_voice_interview():
-    st.markdown('<p class="main-header">Employee Voice Interview</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">In-depth qualitative interview - 12 narrative questions</p>', unsafe_allow_html=True)
+    partners_data = partners.data or []
+    candidates_data = candidates.data or []
+    placements_data = placements.data or []
+    reviews_data = reviews.data or []
     
-    try:
-        placements = supabase.table("placements").select("*").eq("status", "Active").execute()
-        
-        if not placements.data:
-            st.info("No active placements to interview.")
-            return
-        
-        placement_options = {f"{p['candidate_name']} ({p.get('partner_name', 'Unknown')})": p for p in placements.data}
-        selected = st.selectbox("Select Employee", [""] + list(placement_options.keys()))
-        
-        if selected:
-            placement = placement_options[selected]
-            partner_id = placement.get("partner_id")
-            
-            with st.form("employee_voice_interview"):
-                narratives = {}
-                
-                # Economic Security
-                st.markdown("### Economic Security and Stability")
-                narratives["economic_input"] = st.text_area(
-                    "Can you describe how predictable your work and income feel here? What helps you feel secure - or makes it hard?",
-                    key="voice_econ_input", height=100
-                )
-                narratives["economic_conversion"] = st.text_area(
-                    "When schedules or pay change, how do you usually find out? How does that make you feel about the stability of your job?",
-                    key="voice_econ_conv", height=100
-                )
-                
-                st.divider()
-                
-                # Skill Growth
-                st.markdown("### Skill Use and Growth")
-                narratives["skill_input"] = st.text_area(
-                    "What kinds of learning or training opportunities do you know about here?",
-                    key="voice_skill_input", height=100
-                )
-                narratives["skill_conversion"] = st.text_area(
-                    "Can you share a time you wanted to join training or learn new skills - what helped or stopped you?",
-                    key="voice_skill_conv", height=100
-                )
-                narratives["skill_capability"] = st.text_area(
-                    "Can you describe a moment when you were able to use your abilities fully at work?",
-                    key="voice_skill_cap", height=100
-                )
-                
-                st.divider()
-                
-                # Dignity & Respect
-                st.markdown("### Workplace Dignity and Respect")
-                narratives["dignity_input"] = st.text_area(
-                    "Have you been told about policies that protect fairness or respect at work?",
-                    key="voice_dignity_input", height=100
-                )
-                narratives["dignity_conversion"] = st.text_area(
-                    "How are you usually treated by colleagues or supervisors? Can you recall a time that made you feel respected - or not?",
-                    key="voice_dignity_conv", height=100
-                )
-                
-                st.divider()
-                
-                # Voice & Agency
-                st.markdown("### Voice and Agency")
-                narratives["voice_input"] = st.text_area(
-                    "Are there ways for you to share your opinions or issues with management?",
-                    key="voice_agency_input", height=100
-                )
-                narratives["voice_conversion"] = st.text_area(
-                    "Can you tell me about a time when you spoke up about something at work? What happened afterwards?",
-                    key="voice_agency_conv", height=100
-                )
-                
-                st.divider()
-                
-                # Belonging & Inclusion
-                st.markdown("### Social Belonging and Inclusion")
-                narratives["belonging_input"] = st.text_area(
-                    "When you first joined, were there any activities that helped you meet people or feel included?",
-                    key="voice_belong_input", height=100
-                )
-                narratives["belonging_conversion"] = st.text_area(
-                    "Can you describe how your team works together day to day? Do you feel comfortable joining conversations?",
-                    key="voice_belong_conv", height=100
-                )
-                narratives["belonging_capability"] = st.text_area(
-                    "What makes you feel you belong here - or sometimes, what makes you feel apart?",
-                    key="voice_belong_cap", height=100
-                )
-                
-                st.divider()
-                
-                # Wellbeing
-                st.markdown("### Wellbeing and Confidence to Plan Ahead")
-                narratives["wellbeing_input"] = st.text_area(
-                    "What kinds of wellbeing or health support are available to you here?",
-                    key="voice_well_input", height=100
-                )
-                narratives["wellbeing_conversion"] = st.text_area(
-                    "If you need time off or help for health reasons, how easy is it to ask for and receive support?",
-                    key="voice_well_conv", height=100
-                )
-                
-                submitted = st.form_submit_button("Submit Interview", use_container_width=True)
-                
-                if submitted:
-                    try:
-                        data = {
-                            "partner_id": partner_id,
-                            "placement_id": placement["id"],
-                            "candidate_name": placement["candidate_name"],
-                            "survey_type": "voice_interview",
-                            "narratives": narratives,
-                            "created_at": datetime.now().isoformat()
-                        }
-                        supabase.table("inclusion_assessment_candidate").insert(data).execute()
-                        st.success("Interview submitted successfully")
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-    except Exception as e:
-        st.error(f"Error: {e}")
+    # Key Stats Row 1
+    st.markdown('<p class="section-header">Programme Overview</p>', unsafe_allow_html=True)
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    col1.metric("Total Partners", len(partners_data))
+    col2.metric("Total Candidates", len(candidates_data))
+    col3.metric("Total Placements", len(placements_data))
+    
+    active_placements = [p for p in placements_data if p.get("status") == "Active"]
+    col4.metric("Currently Employed", len(active_placements))
+    
+    retention = round((len(active_placements) / len(placements_data)) * 100) if placements_data else 0
+    col5.metric("Overall Retention", f"{retention}%")
+    
+    # Key Stats Row 2
+    col1, col2, col3, col4 = st.columns(4)
+    
+    available_candidates = [c for c in candidates_data if c.get("status") == "Available"]
+    col1.metric("Available for Placement", len(available_candidates))
+    
+    progressions = sum(1 for r in reviews_data if r.get("progression"))
+    col2.metric("Career Progressions", progressions)
+    
+    training = sum(1 for r in reviews_data if r.get("received_training"))
+    col3.metric("Training Completed", training)
+    
+    # Countries represented
+    countries = set()
+    for c in candidates_data:
+        country = c.get("country_of_origin")
+        if country and country not in ["United Kingdom", "UK", "Unknown", ""]:
+            countries.add(country)
+    col4.metric("Countries Represented", len(countries))
+    
+    # Partner Breakdown by Type
+    st.markdown('<p class="section-header">Partners by Type</p>', unsafe_allow_html=True)
+    
+    partner_types_count = {}
+    for p in partners_data:
+        ptype = p.get("partner_type", "Other")
+        partner_types_count[ptype] = partner_types_count.get(ptype, 0) + 1
+    
+    if partner_types_count:
+        cols = st.columns(len(partner_types_count))
+        for i, (ptype, count) in enumerate(partner_types_count.items()):
+            cols[i].metric(ptype, count)
+    else:
+        st.info("No partners registered yet")
+    
+    # Sector Breakdown
+    st.markdown('<p class="section-header">Placements by Sector</p>', unsafe_allow_html=True)
+    
+    sector_counts = {}
+    for p in partners_data:
+        sector = p.get("sector", "Other")
+        # Count placements for this partner
+        partner_placements = [pl for pl in placements_data if pl.get("partner_id") == p.get("id")]
+        if sector in sector_counts:
+            sector_counts[sector] += len(partner_placements)
+        else:
+            sector_counts[sector] = len(partner_placements)
+    
+    if sector_counts:
+        sorted_sectors = sorted(sector_counts.items(), key=lambda x: x[1], reverse=True)[:6]
+        cols = st.columns(len(sorted_sectors))
+        for i, (sector, count) in enumerate(sorted_sectors):
+            # Shorten sector name for display
+            display_name = sector.split(" - ")[0] if " - " in sector else sector
+            cols[i].metric(display_name[:20], count)
+    
+    # Recent Activity
+    st.markdown('<p class="section-header">Recent Placements</p>', unsafe_allow_html=True)
+    
+    if placements_data:
+        recent = sorted(placements_data, key=lambda x: x.get("created_at", ""), reverse=True)[:5]
+        for p in recent:
+            start_date = p.get("start_date", "N/A")
+            st.write(f"**{p.get('candidate_name', 'Unknown')}** started as {p.get('role', 'N/A')} at {p.get('partner_name', 'Unknown')} ({start_date})")
+    else:
+        st.info("No placements yet")
+    
+    # Candidates by Country
+    st.markdown('<p class="section-header">Candidates by Country of Origin</p>', unsafe_allow_html=True)
+    
+    country_counts = {}
+    for c in candidates_data:
+        country = c.get("country_of_origin")
+        if country and country not in ["United Kingdom", "UK", "Unknown", ""]:
+            country_counts[country] = country_counts.get(country, 0) + 1
+    
+    if country_counts:
+        sorted_countries = sorted(country_counts.items(), key=lambda x: x[1], reverse=True)[:8]
+        cols = st.columns(min(len(sorted_countries), 4))
+        for i, (country, count) in enumerate(sorted_countries[:4]):
+            cols[i].metric(country, count)
+        if len(sorted_countries) > 4:
+            cols = st.columns(min(len(sorted_countries) - 4, 4))
+            for i, (country, count) in enumerate(sorted_countries[4:8]):
+                cols[i].metric(country, count)
+    else:
+        st.info("No candidate country data yet")
+    
+    # Pending Actions
+    st.markdown('<p class="section-header">Pending Actions</p>', unsafe_allow_html=True)
+    
+    all_pending = []
+    for p in partners_data:
+        pending = get_pending_reviews(p.get("id"))
+        for review in pending:
+            review["partner_name"] = p.get("name", "Unknown")
+        all_pending.extend(pending)
+    
+    if all_pending:
+        for p in all_pending[:5]:
+            st.warning(f"**{p['partner_name']}**: {p['candidate_name']} - {p['milestone']} due {p['due_date']}")
+    else:
+        st.success("All milestone reviews are up to date")
 
 
-# ============ OTHER PAGES ============
+# ============ ACH MANAGE PARTNERS ============
 def ach_manage_partners():
     st.markdown('<p class="main-header">Manage Partners</p>', unsafe_allow_html=True)
     
@@ -979,40 +739,69 @@ def ach_manage_partners():
             partners = supabase.table("impact_partners").select("*").execute()
             if partners.data:
                 for p in partners.data:
-                    with st.expander(f"{p['name']} - {p.get('sector', 'N/A')}"):
-                        st.write(f"**Contact:** {p.get('contact_name', 'N/A')}")
-                        st.write(f"**Email:** {p.get('contact_email', 'N/A')}")
-                        st.write(f"**Employees:** {p.get('employee_count', 'N/A')}")
+                    with st.expander(f"{p['name']} - {p.get('partner_type', 'N/A')} - {p.get('sector', 'N/A')}"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**Type:** {p.get('partner_type', 'N/A')}")
+                            st.write(f"**Sector:** {p.get('sector', 'N/A')}")
+                            st.write(f"**Employees:** {p.get('employee_count', 'N/A')}")
+                        with col2:
+                            st.write(f"**Contact:** {p.get('contact_name', 'N/A')}")
+                            st.write(f"**Email:** {p.get('contact_email', 'N/A')}")
+                            st.write(f"**Phone:** {p.get('contact_phone', 'N/A')}")
+            else:
+                st.info("No partners registered yet")
         except:
-            st.info("No partners found.")
+            st.info("No partners registered yet")
     
     with tab2:
         with st.form("add_partner"):
-            name = st.text_input("Organisation Name")
-            sector = st.selectbox("Sector", ["", "Healthcare", "Social Care", "Hospitality", "Retail", "Manufacturing", "Logistics", "Public Sector", "Education", "Facilities", "Other"])
-            employee_count = st.number_input("Number of Employees", min_value=1, value=50)
-            contact_name = st.text_input("Contact Name")
-            contact_email = st.text_input("Contact Email")
+            st.subheader("Add New Partner")
+            
+            name = st.text_input("Organisation Name *")
+            partner_type = st.selectbox("Partner Type *", [""] + PARTNER_TYPES)
+            
+            # Searchable sector dropdown
+            sector = st.selectbox(
+                "Sector *",
+                [""] + SECTORS,
+                help="Start typing to search sectors"
+            )
+            
+            employee_count = st.selectbox("Number of Employees *", [""] + EMPLOYEE_RANGES)
+            
+            st.divider()
+            st.subheader("Primary Contact")
+            
+            contact_name = st.text_input("Contact Name *")
+            contact_email = st.text_input("Contact Email *")
+            contact_phone = st.text_input("Phone (optional)")
             
             submitted = st.form_submit_button("Add Partner", use_container_width=True)
             
-            if submitted and name and sector:
-                try:
-                    data = {
-                        "name": name,
-                        "sector": sector,
-                        "employee_count": employee_count,
-                        "contact_name": contact_name,
-                        "contact_email": contact_email,
-                        "created_at": datetime.now().isoformat()
-                    }
-                    supabase.table("impact_partners").insert(data).execute()
-                    st.success(f"{name} added successfully")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
+            if submitted:
+                if not name or not partner_type or not sector or not contact_name or not contact_email:
+                    st.error("Please fill in all required fields")
+                else:
+                    try:
+                        data = {
+                            "name": name,
+                            "partner_type": partner_type,
+                            "sector": sector,
+                            "employee_count": employee_count,
+                            "contact_name": contact_name,
+                            "contact_email": contact_email,
+                            "contact_phone": contact_phone,
+                            "created_at": datetime.now().isoformat()
+                        }
+                        supabase.table("impact_partners").insert(data).execute()
+                        st.success(f"{name} added successfully")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
 
 
+# ============ ACH MANAGE CANDIDATES ============
 def ach_manage_candidates():
     st.markdown('<p class="main-header">Manage Candidates</p>', unsafe_allow_html=True)
     
@@ -1025,62 +814,243 @@ def ach_manage_candidates():
                 df = pd.DataFrame(candidates.data)
                 display_cols = [c for c in ["name", "cohort", "country_of_origin", "status"] if c in df.columns]
                 st.dataframe(df[display_cols], use_container_width=True)
+            else:
+                st.info("No candidates registered yet")
         except:
-            st.info("No candidates found.")
+            st.info("No candidates registered yet")
     
     with tab2:
         with st.form("add_candidate"):
-            name = st.text_input("Full Name")
-            cohort = st.text_input("Cohort/Programme")
-            country_of_origin = st.selectbox("Country of Origin", 
-                ["", "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan",
-                "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi",
-                "Cambodia", "Cameroon", "Canada", "Cape Verde", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic",
-                "Democratic Republic of the Congo", "Denmark", "Djibouti", "Dominica", "Dominican Republic",
-                "East Timor", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia",
-                "Fiji", "Finland", "France",
-                "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana",
-                "Haiti", "Honduras", "Hungary",
-                "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Ivory Coast",
-                "Jamaica", "Japan", "Jordan",
-                "Kazakhstan", "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan",
-                "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg",
-                "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar",
-                "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway",
-                "Oman",
-                "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal",
-                "Qatar",
-                "Romania", "Russia", "Rwanda",
-                "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria",
-                "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu",
-                "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan",
-                "Vanuatu", "Vatican City", "Venezuela", "Vietnam",
-                "Yemen",
-                "Zambia", "Zimbabwe"])
+            name = st.text_input("Full Name *")
+            cohort = st.text_input("Cohort/Programme *")
+            country_of_origin = st.selectbox("Country of Origin *", ALL_COUNTRIES)
             
             submitted = st.form_submit_button("Add Candidate", use_container_width=True)
             
-            if submitted and name:
+            if submitted:
+                if not name or not country_of_origin:
+                    st.error("Please fill in required fields")
+                else:
+                    try:
+                        data = {
+                            "name": name,
+                            "cohort": cohort,
+                            "country_of_origin": country_of_origin,
+                            "status": "Available",
+                            "created_at": datetime.now().isoformat()
+                        }
+                        supabase.table("candidates").insert(data).execute()
+                        st.success(f"{name} added successfully")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+
+
+# ============ ACH CAPABILITY ASSESSMENT ============
+def ach_capability_assessment():
+    st.markdown('<p class="main-header">Candidate Capability Assessment</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Assess candidates across 7 capability domains</p>', unsafe_allow_html=True)
+    
+    try:
+        candidates = supabase.table("candidates").select("*").execute()
+        if not candidates.data:
+            st.info("No candidates available")
+            return
+        
+        candidate_options = {c["name"]: c for c in candidates.data}
+        selected = st.selectbox("Select Candidate", [""] + list(candidate_options.keys()))
+        
+        if not selected:
+            return
+        
+        candidate = candidate_options[selected]
+        
+        assessment_stage = st.selectbox("Assessment Stage", ["Baseline", "3-Month", "6-Month", "12-Month", "Exit"])
+        
+        # Domain selector
+        domain_names = {k: v["name"] for k, v in CAPABILITY_DOMAINS.items()}
+        selected_domain = st.selectbox("Select Domain", [""] + list(domain_names.values()))
+        
+        if not selected_domain:
+            st.info("Select a domain to begin assessment")
+            return
+        
+        # Find domain key
+        domain_key = None
+        for k, v in CAPABILITY_DOMAINS.items():
+            if v["name"] == selected_domain:
+                domain_key = k
+                break
+        
+        if not domain_key:
+            return
+        
+        domain = CAPABILITY_DOMAINS[domain_key]
+        
+        st.markdown(f"### {domain['name']}")
+        st.write(domain['description'])
+        
+        with st.form(f"assessment_{domain_key}"):
+            responses = {}
+            
+            for factor_type in ["personal", "social", "environmental"]:
+                st.markdown(f"**{factor_type.title()} Factors**")
+                
+                factors = domain["factors"].get(factor_type, [])
+                for factor in factors:
+                    key = factor["key"]
+                    question = factor["question"]
+                    q_type = factor["type"]
+                    narrative = factor.get("narrative")
+                    
+                    if q_type == "scale":
+                        responses[key] = st.slider(question, 1, 5, 3, key=f"{domain_key}_{key}")
+                    elif q_type == "yes_no":
+                        responses[key] = st.radio(question, ["Yes", "No"], horizontal=True, key=f"{domain_key}_{key}")
+                    elif q_type == "number":
+                        responses[key] = st.number_input(question, min_value=0, max_value=100, value=0, key=f"{domain_key}_{key}")
+                    
+                    if narrative:
+                        responses[f"{key}_narrative"] = st.text_area(f"Narrative: {narrative}", key=f"{domain_key}_{key}_narr", height=80)
+                
+                st.divider()
+            
+            submitted = st.form_submit_button("Save Assessment", use_container_width=True)
+            
+            if submitted:
                 try:
                     data = {
-                        "name": name,
-                        "cohort": cohort,
-                        "country_of_origin": country_of_origin,
-                        "status": "Available",
+                        "candidate_id": candidate["id"],
+                        "candidate_name": candidate["name"],
+                        "domain": domain_key,
+                        "stage": assessment_stage,
+                        "responses": json.dumps(responses),
                         "created_at": datetime.now().isoformat()
                     }
-                    supabase.table("candidates").insert(data).execute()
-                    st.success(f"{name} added successfully")
-                    st.rerun()
+                    supabase.table("capability_assessments").insert(data).execute()
+                    st.success("Assessment saved successfully")
                 except Exception as e:
                     st.error(f"Error: {e}")
+    
+    except Exception as e:
+        st.error(f"Error: {e}")
 
 
+# ============ ACH CANDIDATE SUPPORT ============
 def ach_candidate_support():
     st.markdown('<p class="main-header">Candidate Support</p>', unsafe_allow_html=True)
-    st.info("Candidate milestone check-in interface")
+    st.info("Candidate milestone check-in interface - coming soon")
 
 
+# ============ PARTNER DASHBOARD ============
+def partner_dashboard():
+    st.markdown('<p class="main-header">Your Impact Dashboard</p>', unsafe_allow_html=True)
+    
+    partner_id = st.session_state.get("user_id", 1)
+    metrics = calculate_impact_metrics(partner_id)
+    
+    # Key Metrics
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Retention Savings", f"£{metrics['retention_savings']:,.0f}", f"vs {metrics['sector']} avg")
+    
+    with col2:
+        diversity = metrics.get("diversity_data", {})
+        st.metric("Diversity Contribution", f"{diversity.get('countries_represented', 0)} countries", f"{diversity.get('total_employees', 0)} employees")
+    
+    with col3:
+        st.metric("Avg Tenure", f"{metrics.get('avg_tenure_months', 0)} months")
+    
+    # Retention Breakdown
+    st.markdown('<p class="section-header">Retention Savings Breakdown</p>', unsafe_allow_html=True)
+    
+    savings_data = metrics.get("retention_savings_data", {})
+    if savings_data:
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Your Retention", f"{savings_data.get('ach_retention_percent', 0)}%")
+        col2.metric("Industry Benchmark", f"{savings_data.get('industry_retention_percent', 0)}%")
+        col3.metric("Your Uplift", f"+{savings_data.get('retention_uplift_percent', 0)}%")
+        col4.metric("Total Savings", f"£{savings_data.get('total_savings', 0):,.0f}")
+        st.caption(savings_data.get('methodology', ''))
+    
+    # Diversity
+    st.markdown('<p class="section-header">Diversity Contribution</p>', unsafe_allow_html=True)
+    
+    diversity = metrics.get("diversity_data", {})
+    if diversity.get("total_employees", 0) > 0:
+        col1, col2 = st.columns(2)
+        col1.metric("Countries Represented", diversity.get("countries_represented", 0))
+        col2.metric("Employees from Global Talent Pool", diversity.get("total_employees", 0))
+    else:
+        st.info("Diversity data will appear once placements are recorded")
+    
+    # Additional Metrics
+    st.markdown('<p class="section-header">Additional Metrics</p>', unsafe_allow_html=True)
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("People Employed", metrics["active_employees"], f"of {metrics['total_placements']}")
+    col2.metric("Retention Rate", f"{metrics['retention_rate']}%")
+    col3.metric("Avg Tenure", f"{metrics.get('avg_tenure_months', 0)} months")
+    col4.metric("Living Wage", f"{metrics['living_wage_percent']}%")
+    col5.metric("Progressions", metrics["progression_count"])
+    
+    # Pending Reviews
+    pending = get_pending_reviews(partner_id)
+    if pending:
+        st.markdown('<p class="section-header">Action Required</p>', unsafe_allow_html=True)
+        for p in pending:
+            st.warning(f"**{p['candidate_name']}** - {p['milestone']} due {p['due_date']}")
+    
+    # Quotes
+    if metrics["quotes"]:
+        st.markdown('<p class="section-header">Success Stories</p>', unsafe_allow_html=True)
+        for quote in metrics["quotes"][:3]:
+            st.markdown(f'<div class="quote-box">"{quote}"</div>', unsafe_allow_html=True)
+
+
+# ============ PARTNER INCLUSION ASSESSMENT ============
+def partner_inclusion_assessment():
+    st.markdown('<p class="main-header">Inclusion Capability Assessment</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Rate your organisation across six dimensions of inclusive employment</p>', unsafe_allow_html=True)
+    
+    partner_id = st.session_state.get("user_id", 1)
+    
+    with st.form("org_inclusion_assessment"):
+        scores = {}
+        
+        for dim_key, dim_data in ORGANISATION_QUESTIONS.items():
+            st.markdown(f"### {dim_data['name']}")
+            
+            scores[dim_key] = {}
+            
+            st.markdown("**Input (Policies and Structures)**")
+            scores[dim_key]["input"] = st.slider(dim_data["input"], 1, 5, 3, key=f"{dim_key}_input")
+            
+            st.markdown("**Conversion (Implementation)**")
+            scores[dim_key]["conversion"] = st.slider(dim_data["conversion"], 1, 5, 3, key=f"{dim_key}_conversion")
+            
+            st.markdown("**Capability (Employee Experience)**")
+            scores[dim_key]["capability"] = st.slider(dim_data["capability"], 1, 5, 3, key=f"{dim_key}_capability")
+            
+            st.divider()
+        
+        submitted = st.form_submit_button("Submit Assessment", use_container_width=True)
+        
+        if submitted:
+            try:
+                data = {
+                    "partner_id": partner_id,
+                    "scores": json.dumps(scores),
+                    "created_at": datetime.now().isoformat()
+                }
+                supabase.table("inclusion_assessment_org").insert(data).execute()
+                st.success("Assessment submitted successfully")
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+
+# ============ PARTNER BASELINE ============
 def partner_baseline():
     st.markdown('<p class="main-header">Baseline Data</p>', unsafe_allow_html=True)
     
@@ -1120,6 +1090,7 @@ def partner_baseline():
                 st.error(f"Error: {e}")
 
 
+# ============ PARTNER INTERVIEW FEEDBACK ============
 def partner_interview_feedback():
     st.markdown('<p class="main-header">Interview Feedback</p>', unsafe_allow_html=True)
     
@@ -1129,7 +1100,7 @@ def partner_interview_feedback():
         candidates = supabase.table("candidates").select("*").eq("status", "Available").execute()
         
         if not candidates.data:
-            st.info("No candidates available.")
+            st.info("No candidates available")
             return
         
         with st.form("interview_feedback"):
@@ -1193,6 +1164,7 @@ def partner_interview_feedback():
         st.error(f"Error: {e}")
 
 
+# ============ PARTNER MILESTONE REVIEW ============
 def partner_milestone_review():
     st.markdown('<p class="main-header">Milestone Reviews</p>', unsafe_allow_html=True)
     
@@ -1236,7 +1208,6 @@ def partner_milestone_review():
                         }
                         supabase.table("milestone_reviews_partner").insert(data).execute()
                         
-                        # Update placement with last milestone check
                         placement_update = {
                             "last_milestone_check": datetime.now().date().isoformat(),
                             "last_milestone_month": review["milestone_month"]
@@ -1254,6 +1225,7 @@ def partner_milestone_review():
                         st.error(f"Error: {e}")
 
 
+# ============ PARTNER REPORTS ============
 def partner_reports():
     st.markdown('<p class="main-header">Impact Reports</p>', unsafe_allow_html=True)
     
@@ -1280,19 +1252,14 @@ def partner_reports():
         st.write(f"**Total Placements:** {metrics['total_placements']}")
         st.write(f"**Currently Employed:** {metrics['active_employees']}")
         st.write(f"**Retention Rate:** {metrics['retention_rate']}%")
-        st.write(f"**Living Wage Roles:** {metrics['living_wage_percent']}%")
+        st.write(f"**Avg Tenure:** {metrics.get('avg_tenure_months', 0)} months")
     
     with col2:
         st.markdown("### Business Value")
         st.write(f"**Retention Savings:** £{metrics['retention_savings']:,.0f}")
+        st.write(f"**Living Wage Roles:** {metrics['living_wage_percent']}%")
         st.write(f"**Employees Trained:** {metrics['training_count']}")
         st.write(f"**Career Progressions:** {metrics['progression_count']}")
-    
-    if metrics.get("inclusion_data"):
-        st.divider()
-        st.markdown("### Inclusion Capability Index")
-        inclusion = metrics["inclusion_data"]
-        st.write(f"**Overall Score:** {inclusion.get('overall_score', 0)}/100 ({inclusion.get('band_label', '')})")
     
     if metrics["quotes"]:
         st.divider()
@@ -1307,7 +1274,6 @@ def main():
         st.markdown(f"### {st.session_state.user_name}")
         st.divider()
         
-        # View switcher
         view_type = st.radio("View As", ["ACH Staff", "Partner"], label_visibility="collapsed")
         
         if view_type == "Partner":
@@ -1319,6 +1285,9 @@ def main():
                     st.session_state.user_type = "partner"
                     st.session_state.user_id = partner_options[selected_partner]
                     st.session_state.user_name = selected_partner
+                else:
+                    st.warning("No partners found")
+                    st.session_state.user_type = "ach_staff"
             except:
                 st.warning("No partners found")
                 st.session_state.user_type = "ach_staff"
@@ -1329,17 +1298,29 @@ def main():
         st.divider()
         
         if st.session_state.user_type == "ach_staff":
-            page = st.radio("Navigation", ["Dashboard", "Manage Partners", "Manage Candidates", "Employee Experience Survey", "Employee Voice Interview", "Candidate Support"], label_visibility="collapsed")
+            page = st.radio("Navigation", [
+                "Dashboard",
+                "Manage Partners",
+                "Manage Candidates",
+                "Capability Assessment",
+                "Candidate Support"
+            ], label_visibility="collapsed")
         else:
-            page = st.radio("Navigation", ["Dashboard", "Inclusion Assessment", "Baseline Data", "Interview Feedback", "Milestone Reviews", "Reports"], label_visibility="collapsed")
+            page = st.radio("Navigation", [
+                "Dashboard",
+                "Inclusion Assessment",
+                "Baseline Data",
+                "Interview Feedback",
+                "Milestone Reviews",
+                "Reports"
+            ], label_visibility="collapsed")
     
     if st.session_state.user_type == "ach_staff":
         pages = {
             "Dashboard": ach_dashboard,
             "Manage Partners": ach_manage_partners,
             "Manage Candidates": ach_manage_candidates,
-            "Employee Experience Survey": ach_employee_experience_survey,
-            "Employee Voice Interview": ach_employee_voice_interview,
+            "Capability Assessment": ach_capability_assessment,
             "Candidate Support": ach_candidate_support
         }
     else:
