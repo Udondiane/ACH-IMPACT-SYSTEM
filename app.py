@@ -1007,7 +1007,7 @@ def ach_review_publish():
                     with st.form(f"edit_form_{placement['id']}"):
                         new_role = st.text_input("Role", value=placement.get("role", ""))
                         new_salary = st.number_input("Salary (£)", value=placement.get("salary", 0), min_value=0)
-                        new_start_date = st.date_input("Start Date", value=datetime.fromisoformat(placement["start_date"]) if placement.get("start_date") else datetime.now())
+                        new_start_date = st.date_input("Start Date", value=datetime.fromisoformat(placement["start_date"]) if placement.get("start_date") else datetime.now(), format="DD/MM/YYYY")
                         
                         if st.form_submit_button("Save Changes"):
                             try:
@@ -1263,7 +1263,7 @@ def partner_candidates():
                 candidate = st.selectbox("Candidate *", [""] + [c["name"] for c in candidates.data])
                 role = st.text_input("Role *")
                 salary = st.number_input("Annual Salary (£) *", min_value=0, value=22500)
-                interview_date = st.date_input("Interview Date")
+                interview_date = st.date_input("Interview Date", format="DD/MM/YYYY")
                 
                 st.divider()
                 
@@ -1271,7 +1271,7 @@ def partner_candidates():
                 
                 if hired == "Yes":
                     feedback_text = st.text_area("What stood out about this candidate?")
-                    start_date = st.date_input("Start Date")
+                    start_date = st.date_input("Start Date", format="DD/MM/YYYY")
                 else:
                     feedback_text = st.text_area("Reason for not progressing")
                     start_date = None
