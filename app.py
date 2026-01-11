@@ -514,11 +514,12 @@ def calculate_impact_metrics(partner_id):
     
     placements = []
     try:
-        result = supabase.table("placements").select("*").eq("partner_id", partner_id).execute()
+        # Only get Published placements for partner dashboard metrics
+        result = supabase.table("placements").select("*").eq("partner_id", partner_id).in_("status", ["Published", "Left"]).execute()
         if result.data:
             placements = result.data
             metrics["total_placements"] = len(placements)
-            active = [p for p in placements if p.get("status") == "Active"]
+            active = [p for p in placements if p.get("status") == "Published"]
             metrics["active_employees"] = len(active)
             
             if active:
@@ -565,7 +566,7 @@ def calculate_impact_metrics(partner_id):
 def get_pending_reviews(partner_id):
     pending = []
     try:
-        placements = supabase.table("placements").select("*").eq("partner_id", partner_id).eq("status", "Active").execute()
+        placements = supabase.table("placements").select("*").eq("partner_id", partner_id).eq("status", "Published").execute()
         if placements.data:
             for p in placements.data:
                 start_date = datetime.fromisoformat(p["start_date"]) if p.get("start_date") else None
@@ -770,6 +771,8 @@ def ach_manage_partners():
             
             employee_count = st.selectbox("Number of Employees *", [""] + EMPLOYEE_RANGES)
             
+            package_tier = st.selectbox("Package Tier *", ["Standard", "Impact Partner"], help="Impact Partners get full dashboard access")
+            
             st.divider()
             st.subheader("Primary Contact")
             
@@ -789,6 +792,7 @@ def ach_manage_partners():
                             "partner_type": partner_type,
                             "sector": sector,
                             "employee_count": employee_count,
+                            "package_tier": package_tier,
                             "contact_name": contact_name,
                             "contact_email": contact_email,
                             "contact_phone": contact_phone,
@@ -942,63 +946,265 @@ def ach_candidate_support():
     st.info("Candidate milestone check-in interface - coming soon")
 
 
+# ============ ACH REVIEW & PUBLISH ============
+def ach_review_publish():
+    st.markdown('<p class="main-header">Review and Publish</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Review draft placements before publishing to partner dashboards</p>', unsafe_allow_html=True)
+    
+    try:
+        # Get all draft placements
+        drafts = supabase.table("placements").select("*").eq("status", "Draft").execute()
+        
+        if not drafts.data:
+            st.success("No draft placements to review")
+            return
+        
+        st.warning(f"{len(drafts.data)} placement(s) pending review")
+        
+        for placement in drafts.data:
+            with st.expander(f"{placement.get('candidate_name', 'Unknown')} at {placement.get('partner_name', 'Unknown')}"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write(f"**Candidate:** {placement.get('candidate_name', 'N/A')}")
+                    st.write(f"**Partner:** {placement.get('partner_name', 'N/A')}")
+                    st.write(f"**Role:** {placement.get('role', 'N/A')}")
+                
+                with col2:
+                    st.write(f"**Start Date:** {placement.get('start_date', 'N/A')}")
+                    st.write(f"**Salary:** £{placement.get('salary', 0):,}")
+                    st.write(f"**Hourly Rate:** £{placement.get('hourly_rate', 0)}")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if st.button("Publish", key=f"publish_{placement['id']}", use_container_width=True):
+                        try:
+                            supabase.table("placements").update({"status": "Published"}).eq("id", placement["id"]).execute()
+                            st.success("Published!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                
+                with col2:
+                    if st.button("Edit", key=f"edit_{placement['id']}", use_container_width=True):
+                        st.session_state[f"editing_{placement['id']}"] = True
+                        st.rerun()
+                
+                with col3:
+                    if st.button("Delete", key=f"delete_{placement['id']}", use_container_width=True):
+                        try:
+                            # Reset candidate status back to Available
+                            supabase.table("candidates").update({"status": "Available"}).eq("id", placement["candidate_id"]).execute()
+                            supabase.table("placements").delete().eq("id", placement["id"]).execute()
+                            st.success("Deleted")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                
+                # Edit form if editing
+                if st.session_state.get(f"editing_{placement['id']}", False):
+                    with st.form(f"edit_form_{placement['id']}"):
+                        new_role = st.text_input("Role", value=placement.get("role", ""))
+                        new_salary = st.number_input("Salary (£)", value=placement.get("salary", 0), min_value=0)
+                        new_start_date = st.date_input("Start Date", value=datetime.fromisoformat(placement["start_date"]) if placement.get("start_date") else datetime.now())
+                        
+                        if st.form_submit_button("Save Changes"):
+                            try:
+                                supabase.table("placements").update({
+                                    "role": new_role,
+                                    "salary": new_salary,
+                                    "hourly_rate": round(new_salary / 52 / 40, 2),
+                                    "start_date": new_start_date.isoformat()
+                                }).eq("id", placement["id"]).execute()
+                                st.session_state[f"editing_{placement['id']}"] = False
+                                st.success("Saved")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error: {e}")
+    
+    except Exception as e:
+        st.error(f"Error: {e}")
+
+
 # ============ PARTNER DASHBOARD ============
 def partner_dashboard():
     st.markdown('<p class="main-header">Your Impact Dashboard</p>', unsafe_allow_html=True)
     
     partner_id = st.session_state.get("user_id", 1)
+    
+    # Check partner tier
+    partner_tier = "Standard"
+    try:
+        partner_data = supabase.table("impact_partners").select("package_tier").eq("id", partner_id).execute()
+        if partner_data.data:
+            partner_tier = partner_data.data[0].get("package_tier", "Standard")
+    except:
+        pass
+    
     metrics = calculate_impact_metrics(partner_id)
     
-    # Key Metrics
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.metric("Estimated Retention Savings", f"£{metrics['retention_savings']:,.0f}")
-    
-    with col2:
+    if partner_tier == "Impact Partner":
+        # Full dashboard for Impact Partners
+        
+        # Key Metrics
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.metric("Estimated Retention Savings", f"£{metrics['retention_savings']:,.0f}")
+        
+        with col2:
+            diversity = metrics.get("diversity_data", {})
+            employees = diversity.get("total_employees", 0)
+            countries = diversity.get("countries_represented", 0)
+            if employees > 0:
+                st.metric("Diversity Contribution", f"{employees} employees", f"representing {countries} countries")
+            else:
+                st.metric("Diversity Contribution", "No data yet")
+        
+        # Retention Breakdown
+        st.markdown('<p class="section-header">Estimated Retention Savings Breakdown</p>', unsafe_allow_html=True)
+        
+        savings_data = metrics.get("retention_savings_data", {})
+        if savings_data:
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Retention Rate", f"{savings_data.get('ach_retention_percent', 0)}%")
+            col2.metric("Industry Benchmark", f"{savings_data.get('industry_retention_percent', 0)}%")
+            col3.metric("Your Uplift", f"+{savings_data.get('retention_uplift_percent', 0)}%")
+            col4.metric("Estimated Savings", f"£{savings_data.get('total_savings', 0):,.0f}")
+            st.caption(savings_data.get('methodology', ''))
+        
+        # Diversity
+        st.markdown('<p class="section-header">Diversity Contribution</p>', unsafe_allow_html=True)
+        
         diversity = metrics.get("diversity_data", {})
         employees = diversity.get("total_employees", 0)
         countries = diversity.get("countries_represented", 0)
         if employees > 0:
-            st.metric("Diversity Contribution", f"{employees} employees", f"representing {countries} countries")
+            st.write(f"**{employees} employees with international experience, representing {countries} countries**")
         else:
-            st.metric("Diversity Contribution", "No data yet")
+            st.info("Diversity data will appear once placements are recorded")
+        
+        # Pending Reviews
+        pending = get_pending_reviews(partner_id)
+        if pending:
+            st.markdown('<p class="section-header">Action Required</p>', unsafe_allow_html=True)
+            for p in pending:
+                st.warning(f"**{p['candidate_name']}** - {p['milestone']} due {p['due_date']}")
+        
+        # Quotes
+        if metrics["quotes"]:
+            st.markdown('<p class="section-header">Success Stories</p>', unsafe_allow_html=True)
+            for quote in metrics["quotes"][:3]:
+                st.markdown(f'<div class="quote-box">"{quote}"</div>', unsafe_allow_html=True)
     
-    # Retention Breakdown
-    st.markdown('<p class="section-header">Estimated Retention Savings Breakdown</p>', unsafe_allow_html=True)
-    
-    savings_data = metrics.get("retention_savings_data", {})
-    if savings_data:
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Retention Rate", f"{savings_data.get('ach_retention_percent', 0)}%")
-        col2.metric("Industry Benchmark", f"{savings_data.get('industry_retention_percent', 0)}%")
-        col3.metric("Your Uplift", f"+{savings_data.get('retention_uplift_percent', 0)}%")
-        col4.metric("Estimated Savings", f"£{savings_data.get('total_savings', 0):,.0f}")
-        st.caption(savings_data.get('methodology', ''))
-    
-    # Diversity
-    st.markdown('<p class="section-header">Diversity Contribution</p>', unsafe_allow_html=True)
-    
-    diversity = metrics.get("diversity_data", {})
-    employees = diversity.get("total_employees", 0)
-    countries = diversity.get("countries_represented", 0)
-    if employees > 0:
-        st.write(f"**{employees} employees with international experience, representing {countries} countries**")
     else:
-        st.info("Diversity data will appear once placements are recorded")
-    
-    # Pending Reviews
-    pending = get_pending_reviews(partner_id)
-    if pending:
-        st.markdown('<p class="section-header">Action Required</p>', unsafe_allow_html=True)
-        for p in pending:
-            st.warning(f"**{p['candidate_name']}** - {p['milestone']} due {p['due_date']}")
-    
-    # Quotes
-    if metrics["quotes"]:
-        st.markdown('<p class="section-header">Success Stories</p>', unsafe_allow_html=True)
-        for quote in metrics["quotes"][:3]:
-            st.markdown(f'<div class="quote-box">"{quote}"</div>', unsafe_allow_html=True)
+        # Locked dashboard for Standard partners
+        
+        st.markdown("""
+        <style>
+            .locked-metric {
+                background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+                border-radius: 12px;
+                padding: 20px;
+                text-align: center;
+                margin: 10px 0;
+            }
+            .locked-value {
+                font-size: 2rem;
+                font-weight: 700;
+                color: #94a3b8;
+                letter-spacing: 3px;
+            }
+            .locked-label {
+                font-size: 0.9rem;
+                color: #64748b;
+                margin-top: 5px;
+            }
+            .upgrade-box {
+                background: linear-gradient(135deg, #0f1c3f 0%, #1a2d5a 100%);
+                border-radius: 12px;
+                padding: 30px;
+                color: white;
+                text-align: center;
+                margin: 30px 0;
+            }
+            .upgrade-title {
+                font-size: 1.3rem;
+                font-weight: 600;
+                margin-bottom: 15px;
+            }
+            .upgrade-text {
+                font-size: 1rem;
+                opacity: 0.9;
+                margin-bottom: 20px;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Teaser metrics - blurred
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            <div class="locked-metric">
+                <div class="locked-value">£████████</div>
+                <div class="locked-label">Estimated Retention Savings</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            diversity = metrics.get("diversity_data", {})
+            employees = diversity.get("total_employees", 0)
+            if employees > 0:
+                st.markdown(f"""
+                <div class="locked-metric">
+                    <div class="locked-value">{employees} employees</div>
+                    <div class="locked-label">Diversity Contribution</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div class="locked-metric">
+                    <div class="locked-value">██████</div>
+                    <div class="locked-label">Diversity Contribution</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Locked retention breakdown
+        st.markdown('<p class="section-header">Estimated Retention Savings Breakdown</p>', unsafe_allow_html=True)
+        
+        col1, col2, col3, col4 = st.columns(4)
+        col1.markdown('<div class="locked-metric"><div class="locked-value">██%</div><div class="locked-label">Retention Rate</div></div>', unsafe_allow_html=True)
+        col2.markdown('<div class="locked-metric"><div class="locked-value">██%</div><div class="locked-label">Industry Benchmark</div></div>', unsafe_allow_html=True)
+        col3.markdown('<div class="locked-metric"><div class="locked-value">+██%</div><div class="locked-label">Your Uplift</div></div>', unsafe_allow_html=True)
+        col4.markdown('<div class="locked-metric"><div class="locked-value">£████</div><div class="locked-label">Estimated Savings</div></div>', unsafe_allow_html=True)
+        
+        # Upgrade prompt
+        st.markdown("""
+        <div class="upgrade-box">
+            <div class="upgrade-title">Unlock Your Full Impact Dashboard</div>
+            <div class="upgrade-text">
+                Your estimated retention savings: £████████<br><br>
+                Opt in to our <strong>Workforce Integration Package</strong> to unlock:<br>
+                • Full retention savings calculations<br>
+                • Diversity contribution insights<br>
+                • Social impact reporting<br>
+                • Retention guarantee<br>
+                • Corporate training
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("Learn More About Impact Partnership", use_container_width=True):
+            st.info("Contact ACH to become an Impact Partner and unlock your full dashboard.")
+        
+        # Still show pending reviews - they need to action these
+        pending = get_pending_reviews(partner_id)
+        if pending:
+            st.markdown('<p class="section-header">Action Required</p>', unsafe_allow_html=True)
+            for p in pending:
+                st.warning(f"**{p['candidate_name']}** - {p['milestone']} due {p['due_date']}")
 
 
 # ============ PARTNER INCLUSION ASSESSMENT ============
@@ -1140,7 +1346,7 @@ def partner_interview_feedback():
                             "start_date": start_date.isoformat(),
                             "salary": salary,
                             "hourly_rate": round(salary / 52 / 40, 2),
-                            "status": "Active",
+                            "status": "Draft",
                             "created_at": datetime.now().isoformat()
                         }
                         supabase.table("placements").insert(placement).execute()
@@ -1294,6 +1500,7 @@ def main():
                 "Dashboard",
                 "Manage Partners",
                 "Manage Candidates",
+                "Review & Publish",
                 "Capability Assessment",
                 "Candidate Support"
             ], label_visibility="collapsed")
@@ -1312,6 +1519,7 @@ def main():
             "Dashboard": ach_dashboard,
             "Manage Partners": ach_manage_partners,
             "Manage Candidates": ach_manage_candidates,
+            "Review & Publish": ach_review_publish,
             "Capability Assessment": ach_capability_assessment,
             "Candidate Support": ach_candidate_support
         }
