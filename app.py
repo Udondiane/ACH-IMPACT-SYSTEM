@@ -2086,6 +2086,11 @@ def partner_reports():
 # ============ NAVIGATION ============
 def main():
     with st.sidebar:
+        # Create placeholder for name at top
+        name_placeholder = st.empty()
+        st.divider()
+        
+        # Selection controls
         view_type = st.radio("View As", ["ACH Staff", "Partner"], label_visibility="collapsed")
         
         if view_type == "Partner":
@@ -2109,7 +2114,9 @@ def main():
             st.session_state.user_type = "ach_staff"
             st.session_state.user_name = "ACH Administrator"
         
-        st.markdown(f"### {st.session_state.user_name}")
+        # Update name placeholder with correct value
+        name_placeholder.markdown(f"### {st.session_state.user_name}")
+        
         st.divider()
         
         if st.session_state.user_type == "ach_staff":
