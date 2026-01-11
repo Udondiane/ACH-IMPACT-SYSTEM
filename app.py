@@ -1260,74 +1260,72 @@ def partner_candidates():
             if not candidates.data:
                 st.info("No candidates available for recruitment")
             else:
-                with st.form("recruitment_form"):
-                    candidate = st.selectbox("Candidate *", [""] + [c["name"] for c in candidates.data])
-                    role = st.text_input("Role *")
-                    salary = st.number_input("Annual Salary (£) *", min_value=0, value=22500)
-                    interview_date = st.date_input("Interview Date")
-                    
-                    st.divider()
-                    
-                    hired = st.radio("Offered Position? *", ["Yes", "No"], horizontal=True)
-                    
-                    if hired == "Yes":
-                        feedback_text = st.text_area("What stood out about this candidate?")
-                        start_date = st.date_input("Start Date")
+                candidate = st.selectbox("Candidate *", [""] + [c["name"] for c in candidates.data])
+                role = st.text_input("Role *")
+                salary = st.number_input("Annual Salary (£) *", min_value=0, value=22500)
+                interview_date = st.date_input("Interview Date")
+                
+                st.divider()
+                
+                hired = st.radio("Offered Position? *", ["Yes", "No"], horizontal=True)
+                
+                if hired == "Yes":
+                    feedback_text = st.text_area("What stood out about this candidate?")
+                    start_date = st.date_input("Start Date")
+                else:
+                    feedback_text = st.text_area("Reason for not progressing")
+                    start_date = None
+                
+                st.divider()
+                confirmed = st.checkbox("I have reviewed this information and confirm it is correct")
+                
+                if st.button("Submit", use_container_width=True):
+                    if not candidate or not role:
+                        st.error("Please fill in required fields")
+                    elif not confirmed:
+                        st.error("Please confirm you have reviewed the information")
                     else:
-                        feedback_text = st.text_area("Reason for not progressing")
-                    
-                    st.divider()
-                    confirmed = st.checkbox("I have reviewed this information and confirm it is correct")
-                    
-                    submitted = st.form_submit_button("Submit", use_container_width=True)
-                    
-                    if submitted:
-                        if not candidate or not role:
-                            st.error("Please fill in required fields")
-                        elif not confirmed:
-                            st.error("Please confirm you have reviewed the information")
-                        else:
-                            try:
-                                cand_data = next(c for c in candidates.data if c["name"] == candidate)
+                        try:
+                            cand_data = next(c for c in candidates.data if c["name"] == candidate)
+                            
+                            feedback = {
+                                "partner_id": partner_id,
+                                "candidate_id": cand_data["id"],
+                                "candidate_name": candidate,
+                                "role": role,
+                                "interview_date": interview_date.isoformat(),
+                                "hired": hired == "Yes",
+                                "standout_reason": feedback_text if hired == "Yes" else None,
+                                "rejection_reason": feedback_text if hired == "No" else None,
+                                "created_at": datetime.now().isoformat()
+                            }
+                            supabase.table("interview_feedback").insert(feedback).execute()
+                            
+                            if hired == "Yes":
+                                partner = supabase.table("impact_partners").select("name").eq("id", partner_id).execute()
+                                partner_name = partner.data[0]["name"] if partner.data else "Unknown"
                                 
-                                feedback = {
+                                placement = {
                                     "partner_id": partner_id,
+                                    "partner_name": partner_name,
                                     "candidate_id": cand_data["id"],
                                     "candidate_name": candidate,
                                     "role": role,
-                                    "interview_date": interview_date.isoformat(),
-                                    "hired": hired == "Yes",
-                                    "standout_reason": feedback_text if hired == "Yes" else None,
-                                    "rejection_reason": feedback_text if hired == "No" else None,
+                                    "start_date": start_date.isoformat(),
+                                    "salary": salary,
+                                    "hourly_rate": round(salary / 52 / 40, 2),
+                                    "status": "Published",
                                     "created_at": datetime.now().isoformat()
                                 }
-                                supabase.table("interview_feedback").insert(feedback).execute()
+                                supabase.table("placements").insert(placement).execute()
+                                supabase.table("candidates").update({"status": "Placed"}).eq("id", cand_data["id"]).execute()
                                 
-                                if hired == "Yes":
-                                    partner = supabase.table("impact_partners").select("name").eq("id", partner_id).execute()
-                                    partner_name = partner.data[0]["name"] if partner.data else "Unknown"
-                                    
-                                    placement = {
-                                        "partner_id": partner_id,
-                                        "partner_name": partner_name,
-                                        "candidate_id": cand_data["id"],
-                                        "candidate_name": candidate,
-                                        "role": role,
-                                        "start_date": start_date.isoformat(),
-                                        "salary": salary,
-                                        "hourly_rate": round(salary / 52 / 40, 2),
-                                        "status": "Published",
-                                        "created_at": datetime.now().isoformat()
-                                    }
-                                    supabase.table("placements").insert(placement).execute()
-                                    supabase.table("candidates").update({"status": "Placed"}).eq("id", cand_data["id"]).execute()
-                                    
-                                    st.success(f"{candidate} hired successfully")
-                                else:
-                                    st.success("Feedback recorded")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Error: {e}")
+                                st.success(f"{candidate} hired successfully")
+                            else:
+                                st.success("Feedback recorded")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
         except Exception as e:
             st.error(f"Error: {e}")
     
