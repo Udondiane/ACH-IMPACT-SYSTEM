@@ -1544,14 +1544,10 @@ def partner_dashboard():
         
         # Get actual metrics for display
         retention_rate = metrics.get("retention_rate")
+        has_12m_data = retention_rate is not None
+        
         if retention_rate is None:
-            # Use current retention if 12-month not available
-            total_placements = metrics.get("total_placements", 0)
-            active = metrics.get("active_employees", 0)
-            if total_placements > 0:
-                retention_rate = round((active / total_placements) * 100)
-            else:
-                retention_rate = 0
+            retention_rate = 0
         
         diversity = metrics.get("diversity_data", {})
         employees = diversity.get("total_employees", 0)
@@ -1560,6 +1556,14 @@ def partner_dashboard():
         with col1:
             savings = metrics.get("retention_savings", 0)
             savings_text = f"£{savings:,.0f} saved" if savings > 0 else "No data yet"
+            
+            # Retention text
+            if has_12m_data:
+                retention_text = f"{retention_rate}%"
+                retention_bar_html = '<div class="impact-metric-bar"><div class="impact-metric-fill" style="width: ' + str(min(retention_rate, 100)) + '%;"></div></div>'
+            else:
+                retention_text = "No data yet"
+                retention_bar_html = ""
             
             # Diversity contribution text
             if employees > 0:
@@ -1573,10 +1577,8 @@ def partner_dashboard():
                 suitability_text = f"{suitability}%"
                 suitability_bar_html = '<div class="impact-metric-bar"><div class="impact-metric-fill" style="width: ' + str(suitability) + '%;"></div></div>'
             else:
-                suitability_text = "No reviews yet"
+                suitability_text = "No data yet"
                 suitability_bar_html = ""
-            
-            retention_bar_width = min(retention_rate, 100)
             
             business_html = '<div class="impact-section">'
             business_html += '<div class="impact-section-title">Business Impact Received</div>'
@@ -1585,8 +1587,8 @@ def partner_dashboard():
             business_html += '<div class="impact-row">'
             business_html += '<span class="impact-metric-name">12-Month Retention</span>'
             business_html += '<div style="display: flex; align-items: center;">'
-            business_html += '<span class="impact-metric-value">' + str(retention_rate) + '%</span>'
-            business_html += '<div class="impact-metric-bar"><div class="impact-metric-fill" style="width: ' + str(retention_bar_width) + '%;"></div></div>'
+            business_html += '<span class="impact-metric-value">' + retention_text + '</span>'
+            business_html += retention_bar_html
             business_html += '</div></div>'
             
             # Row 2: Savings
