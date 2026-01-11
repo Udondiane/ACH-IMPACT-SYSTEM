@@ -965,7 +965,7 @@ def partner_dashboard():
             st.metric("Diversity Contribution", "No data yet")
     
     # Retention Breakdown
-    st.markdown('<p class="section-header">Retention Breakdown</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-header">Estimated Retention Savings Breakdown</p>', unsafe_allow_html=True)
     
     savings_data = metrics.get("retention_savings_data", {})
     if savings_data:
