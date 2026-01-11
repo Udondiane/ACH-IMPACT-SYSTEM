@@ -1539,7 +1539,7 @@ def partner_dashboard():
             </div>
             """, unsafe_allow_html=True)
         
-        # Business Impact Received Section
+        # Business Impact Generated Section
         col1, col2 = st.columns(2)
         
         # Get actual metrics for display
@@ -1581,7 +1581,7 @@ def partner_dashboard():
                 suitability_bar_html = ""
             
             business_html = '<div class="impact-section">'
-            business_html += '<div class="impact-section-title">Business Impact Received</div>'
+            business_html += '<div class="impact-section-title">Business Impact Generated</div>'
             
             # Row 1: Retention
             business_html += '<div class="impact-row">'
