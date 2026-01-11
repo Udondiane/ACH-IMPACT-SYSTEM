@@ -2086,9 +2086,6 @@ def partner_reports():
 # ============ NAVIGATION ============
 def main():
     with st.sidebar:
-        st.markdown(f"### {st.session_state.user_name}")
-        st.divider()
-        
         view_type = st.radio("View As", ["ACH Staff", "Partner"], label_visibility="collapsed")
         
         if view_type == "Partner":
@@ -2103,13 +2100,16 @@ def main():
                 else:
                     st.warning("No partners found")
                     st.session_state.user_type = "ach_staff"
+                    st.session_state.user_name = "ACH Administrator"
             except:
                 st.warning("No partners found")
                 st.session_state.user_type = "ach_staff"
+                st.session_state.user_name = "ACH Administrator"
         else:
             st.session_state.user_type = "ach_staff"
             st.session_state.user_name = "ACH Administrator"
         
+        st.markdown(f"### {st.session_state.user_name}")
         st.divider()
         
         if st.session_state.user_type == "ach_staff":
