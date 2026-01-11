@@ -1047,12 +1047,42 @@ def ach_manage_candidates():
         try:
             candidates = supabase.table("candidates").select("*").execute()
             if candidates.data:
-                df = pd.DataFrame(candidates.data)
-                display_cols = [c for c in ["name", "cohort", "country_of_origin", "status"] if c in df.columns]
-                st.dataframe(df[display_cols], use_container_width=True)
+                for c in candidates.data:
+                    with st.expander(f"{c['name']} - {c.get('status', 'N/A')}"):
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write(f"**Name:** {c['name']}")
+                            st.write(f"**Cohort:** {c.get('cohort', 'N/A')}")
+                            st.write(f"**Country:** {c.get('country_of_origin', 'N/A')}")
+                            st.write(f"**Status:** {c.get('status', 'N/A')}")
+                        
+                        with col2:
+                            if c.get('status') == 'Available':
+                                if st.button("🗑️ Delete", key=f"delete_candidate_{c['id']}", type="secondary"):
+                                    st.session_state[f"confirm_delete_{c['id']}"] = True
+                                
+                                if st.session_state.get(f"confirm_delete_{c['id']}"):
+                                    st.warning(f"Are you sure you want to delete {c['name']}?")
+                                    col_yes, col_no = st.columns(2)
+                                    with col_yes:
+                                        if st.button("Yes, delete", key=f"confirm_yes_{c['id']}"):
+                                            try:
+                                                supabase.table("candidates").delete().eq("id", c["id"]).execute()
+                                                st.success(f"{c['name']} deleted")
+                                                del st.session_state[f"confirm_delete_{c['id']}"]
+                                                st.rerun()
+                                            except Exception as e:
+                                                st.error(f"Error: {e}")
+                                    with col_no:
+                                        if st.button("Cancel", key=f"confirm_no_{c['id']}"):
+                                            del st.session_state[f"confirm_delete_{c['id']}"]
+                                            st.rerun()
+                            else:
+                                st.info("Cannot delete - candidate has placements")
             else:
                 st.info("No candidates registered yet")
-        except:
+        except Exception as e:
             st.info("No candidates registered yet")
     
     with tab2:
