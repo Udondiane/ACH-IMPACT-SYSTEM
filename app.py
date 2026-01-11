@@ -631,6 +631,17 @@ def calculate_impact_metrics(partner_id):
             metrics["quotes"] = [r.get("contribution_quote") for r in reviews.data if r.get("contribution_quote")]
             metrics["progression_count"] = sum(1 for r in reviews.data if r.get("progression"))
             metrics["training_count"] = sum(1 for r in reviews.data if r.get("received_training"))
+            
+            # Candidate suitability from performance ratings
+            performance_ratings = [r.get("performance") for r in reviews.data if r.get("performance")]
+            if performance_ratings:
+                # Count Excellent and Good as positive
+                positive_ratings = sum(1 for r in performance_ratings if r in ["Excellent", "Good"])
+                metrics["candidate_suitability"] = round((positive_ratings / len(performance_ratings)) * 100)
+                metrics["total_reviews"] = len(performance_ratings)
+            else:
+                metrics["candidate_suitability"] = None
+                metrics["total_reviews"] = 0
     except:
         pass
     
@@ -1548,6 +1559,13 @@ def partner_dashboard():
             else:
                 diversity_text = "No data yet"
             
+            # Candidate suitability text
+            suitability = metrics.get("candidate_suitability")
+            if suitability is not None:
+                suitability_text = f"{suitability}%"
+            else:
+                suitability_text = "No reviews yet"
+            
             st.markdown(f"""
             <div class="impact-section">
                 <div class="impact-section-title">Business Impact Received</div>
@@ -1562,6 +1580,13 @@ def partner_dashboard():
                     <span class="impact-metric-name">Estimated Retention Savings</span>
                     <div style="display: flex; align-items: center;">
                         <span class="impact-metric-value">{savings_text}</span>
+                    </div>
+                </div>
+                <div class="impact-row">
+                    <span class="impact-metric-name">Candidate Suitability</span>
+                    <div style="display: flex; align-items: center;">
+                        <span class="impact-metric-value">{suitability_text}</span>
+                        {f'<div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {suitability}%;"></div></div>' if suitability is not None else ''}
                     </div>
                 </div>
                 <div class="impact-row">
@@ -1608,6 +1633,30 @@ def partner_dashboard():
                 {dimensions_html}
             </div>
             """, unsafe_allow_html=True)
+        
+        # Retention Breakdown
+        st.markdown('<div class="section-divider">Estimated Retention Savings Breakdown</div>', unsafe_allow_html=True)
+        
+        savings_data = metrics.get("retention_savings_data", {})
+        retention_rate_12m = metrics.get("retention_rate")
+        
+        if retention_rate_12m is not None and savings_data:
+            st.caption(f"Based on {metrics.get('placements_12m_plus', 0)} placements that have reached 12 months")
+            
+            ach_rate = savings_data.get('ach_retention_percent', 0)
+            industry_rate = savings_data.get('industry_retention_percent', 0)
+            difference = savings_data.get('retention_uplift_percent', 0)
+            
+            st.markdown(f"""
+            <div class="breakdown-card" style="text-align: center; padding: 30px;">
+                <div class="breakdown-label" style="margin-bottom: 15px;">Your Rate vs Industry</div>
+                <div class="breakdown-value">{ach_rate}% vs {industry_rate}% <span style="color: #22c55e;">(+{difference}%)</span></div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.caption(savings_data.get('methodology', ''))
+        else:
+            st.info(f"Retention data will be available once placements reach 12 months. You currently have {metrics.get('active_employees', 0)} active employee(s).")
         
         # Pending Reviews
         pending = get_pending_reviews(partner_id)
