@@ -981,12 +981,13 @@ def ach_dashboard():
         st.success("All milestone reviews are up to date")
 
 
-# ============ ACH MANAGE PARTNERS ============
+# ============ ACH MANAGE PARTNERS (UPDATED WITH EDIT) ============
 def ach_manage_partners():
     st.markdown('<p class="main-header">Manage Partners</p>', unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["View Partners", "Add Partner"])
+    tab1, tab2, tab3 = st.tabs(["View Partners", "Add Partner", "Edit Partner"])
     
+    # ============ VIEW PARTNERS TAB ============
     with tab1:
         try:
             partners = supabase.table("impact_partners").select("*").execute()
@@ -998,15 +999,54 @@ def ach_manage_partners():
                             st.write(f"**Type:** {p.get('partner_type', 'N/A')}")
                             st.write(f"**Sector:** {p.get('sector', 'N/A')}")
                             st.write(f"**Employees:** {p.get('employee_count', 'N/A')}")
+                            st.write(f"**Package:** {p.get('package_tier', 'Standard')}")
                         with col2:
                             st.write(f"**Contact:** {p.get('contact_name', 'N/A')}")
                             st.write(f"**Email:** {p.get('contact_email', 'N/A')}")
                             st.write(f"**Phone:** {p.get('contact_phone', 'N/A')}")
+                        
+                        st.divider()
+                        
+                        # Action buttons
+                        col_edit, col_delete = st.columns(2)
+                        with col_edit:
+                            if st.button("✏️ Edit Partner", key=f"edit_btn_{p['id']}", use_container_width=True):
+                                st.session_state.edit_partner_id = p['id']
+                                st.rerun()
+                        
+                        with col_delete:
+                            if st.button("🗑️ Delete Partner", key=f"delete_partner_{p['id']}", use_container_width=True, type="secondary"):
+                                st.session_state[f"confirm_delete_partner_{p['id']}"] = True
+                        
+                        # Delete confirmation
+                        if st.session_state.get(f"confirm_delete_partner_{p['id']}"):
+                            st.warning(f"Are you sure you want to delete {p['name']}? This will also delete all associated placements and reviews.")
+                            col_yes, col_no = st.columns(2)
+                            with col_yes:
+                                if st.button("Yes, delete", key=f"confirm_yes_partner_{p['id']}"):
+                                    try:
+                                        # Delete associated records first
+                                        supabase.table("milestone_reviews_partner").delete().eq("partner_id", p["id"]).execute()
+                                        supabase.table("placements").delete().eq("partner_id", p["id"]).execute()
+                                        supabase.table("interview_feedback").delete().eq("partner_id", p["id"]).execute()
+                                        supabase.table("inclusion_assessment_org").delete().eq("partner_id", p["id"]).execute()
+                                        # Delete partner
+                                        supabase.table("impact_partners").delete().eq("id", p["id"]).execute()
+                                        st.success(f"{p['name']} deleted")
+                                        del st.session_state[f"confirm_delete_partner_{p['id']}"]
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Error: {e}")
+                            with col_no:
+                                if st.button("Cancel", key=f"confirm_no_partner_{p['id']}"):
+                                    del st.session_state[f"confirm_delete_partner_{p['id']}"]
+                                    st.rerun()
             else:
                 st.info("No partners registered yet")
         except:
             st.info("No partners registered yet")
     
+    # ============ ADD PARTNER TAB ============
     with tab2:
         with st.form("add_partner"):
             st.subheader("Add New Partner")
@@ -1055,6 +1095,120 @@ def ach_manage_partners():
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
+    
+    # ============ EDIT PARTNER TAB ============
+    with tab3:
+        try:
+            partners = supabase.table("impact_partners").select("*").execute()
+            if not partners.data:
+                st.info("No partners to edit")
+            else:
+                partner_options = {p["name"]: p for p in partners.data}
+                
+                # Check if we came from a quick edit button
+                preselected_name = None
+                if "edit_partner_id" in st.session_state:
+                    for p in partners.data:
+                        if p["id"] == st.session_state.edit_partner_id:
+                            preselected_name = p["name"]
+                            break
+                
+                # Partner selector
+                partner_names = [""] + list(partner_options.keys())
+                default_index = 0
+                if preselected_name and preselected_name in partner_names:
+                    default_index = partner_names.index(preselected_name)
+                
+                selected_name = st.selectbox(
+                    "Select Partner to Edit",
+                    partner_names,
+                    index=default_index,
+                    key="edit_partner_selector"
+                )
+                
+                if not selected_name:
+                    st.info("Select a partner to edit their details")
+                else:
+                    partner = partner_options[selected_name]
+                    
+                    # Clear the preselection after use
+                    if "edit_partner_id" in st.session_state:
+                        del st.session_state.edit_partner_id
+                    
+                    st.divider()
+                    st.subheader(f"Editing: {partner['name']}")
+                    
+                    with st.form("edit_partner_form"):
+                        # Organisation details
+                        st.markdown("**Organisation Details**")
+                        
+                        edit_name = st.text_input("Organisation Name *", value=partner.get("name", ""))
+                        
+                        # Partner type
+                        partner_type_options = [""] + PARTNER_TYPES
+                        current_type = partner.get("partner_type", "")
+                        type_index = partner_type_options.index(current_type) if current_type in partner_type_options else 0
+                        edit_partner_type = st.selectbox("Partner Type *", partner_type_options, index=type_index)
+                        
+                        # Sector
+                        sector_options = [""] + SECTORS
+                        current_sector = partner.get("sector", "")
+                        sector_index = sector_options.index(current_sector) if current_sector in sector_options else 0
+                        edit_sector = st.selectbox("Sector *", sector_options, index=sector_index)
+                        
+                        # Employee count
+                        employee_options = [""] + EMPLOYEE_RANGES
+                        current_employees = partner.get("employee_count", "")
+                        employee_index = employee_options.index(current_employees) if current_employees in employee_options else 0
+                        edit_employee_count = st.selectbox("Number of Employees *", employee_options, index=employee_index)
+                        
+                        # Package tier
+                        package_options = ["Standard", "Impact Partner"]
+                        current_package = partner.get("package_tier", "Standard")
+                        package_index = package_options.index(current_package) if current_package in package_options else 0
+                        edit_package_tier = st.selectbox("Package Tier *", package_options, index=package_index)
+                        
+                        st.divider()
+                        st.markdown("**Primary Contact**")
+                        
+                        edit_contact_name = st.text_input("Contact Name *", value=partner.get("contact_name", ""))
+                        edit_contact_email = st.text_input("Contact Email *", value=partner.get("contact_email", ""))
+                        edit_contact_phone = st.text_input("Phone (optional)", value=partner.get("contact_phone", ""))
+                        
+                        st.divider()
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            save_clicked = st.form_submit_button("💾 Save Changes", use_container_width=True, type="primary")
+                        with col2:
+                            cancel_clicked = st.form_submit_button("Cancel", use_container_width=True)
+                        
+                        if cancel_clicked:
+                            st.rerun()
+                        
+                        if save_clicked:
+                            if not edit_name or not edit_partner_type or not edit_sector or not edit_contact_name or not edit_contact_email:
+                                st.error("Please fill in all required fields")
+                            else:
+                                try:
+                                    update_data = {
+                                        "name": edit_name,
+                                        "partner_type": edit_partner_type,
+                                        "sector": edit_sector,
+                                        "employee_count": edit_employee_count,
+                                        "package_tier": edit_package_tier,
+                                        "contact_name": edit_contact_name,
+                                        "contact_email": edit_contact_email,
+                                        "contact_phone": edit_contact_phone,
+                                        "updated_at": datetime.now().isoformat()
+                                    }
+                                    supabase.table("impact_partners").update(update_data).eq("id", partner["id"]).execute()
+                                    st.success(f"{edit_name} updated successfully!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error updating partner: {e}")
+        except Exception as e:
+            st.error(f"Error: {e}")
 
 
 # ============ ACH MANAGE CANDIDATES ============
@@ -1839,8 +1993,6 @@ def partner_inclusion_assessment():
                 }
                 supabase.table("inclusion_assessment_org").insert(data).execute()
                 st.success("Assessment submitted successfully")
-            except Exception as e:
-                st.error(f"Error: {e}")
             except Exception as e:
                 st.error(f"Error: {e}")
 
