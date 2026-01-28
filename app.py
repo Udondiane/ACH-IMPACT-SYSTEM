@@ -392,32 +392,6 @@ HOLISTIC_IMPACT_QUESTIONS = {
     }
 }
 
-# Score bands for assessments
-SCORE_BANDS = [
-    {"min": 0, "max": 40, "label": "Foundational", "description": "Basic structures need development"},
-    {"min": 41, "max": 60, "label": "Developing", "description": "Progress made, gaps remain"},
-    {"min": 61, "max": 80, "label": "Established", "description": "Good practice, some areas to strengthen"},
-    {"min": 81, "max": 100, "label": "Leading", "description": "Strong capability across all areas"}
-]
-
-def get_score_band(score):
-    for band in SCORE_BANDS:
-        if band["min"] <= score <= band["max"]:
-            return band
-    return SCORE_BANDS[0]
-
-def get_score_interpretation(score, dimension_name):
-    """Get interpretation text for a dimension score"""
-    band = get_score_band(score)
-    if band["label"] == "Leading":
-        return f"Excellent performance in {dimension_name}. You are demonstrating best practice."
-    elif band["label"] == "Established":
-        return f"Good performance in {dimension_name}. Minor improvements could strengthen this further."
-    elif band["label"] == "Developing":
-        return f"Progress made in {dimension_name}, but there are gaps that need attention."
-    else:
-        return f"{dimension_name} needs development. Consider reviewing your practices in this area."
-
 # ============ DATABASE CONNECTION ============
 @st.cache_resource
 def get_supabase():
@@ -446,11 +420,6 @@ st.markdown("""
     .stat-label { font-size: 0.85rem; color: #64748b; }
     div[data-testid="stSidebar"] { background: linear-gradient(180deg, #0f1c3f 0%, #1a2d5a 100%); }
     div[data-testid="stSidebar"] .stMarkdown { color: white; }
-    .executive-summary { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 16px; padding: 30px; margin-bottom: 30px; border-left: 5px solid #0f1c3f; }
-    .impact-breakdown { background: white; border-radius: 12px; padding: 20px; margin: 10px 0; border: 1px solid #e2e8f0; }
-    .dimension-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
-    .dimension-score { font-weight: 600; min-width: 60px; text-align: right; }
-    .dimension-interpretation { font-size: 0.85rem; color: #64748b; margin-top: 4px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -464,10 +433,7 @@ if 'user_name' not in st.session_state:
 
 # ============ HELPER FUNCTIONS ============
 def get_replacement_multiplier(salary):
-    """
-    Replacement cost as percentage of salary.
-    Based on Oxford Economics, CIPD, and Centric HR research.
-    """
+    """Replacement cost as percentage of salary."""
     if salary < 25000:
         return 0.16
     elif salary < 35000:
@@ -478,13 +444,9 @@ def get_replacement_multiplier(salary):
         return 1.00
 
 def calculate_integration_contribution(placements, candidates_data):
-    """
-    Calculate contribution to refugee integration and social cohesion.
-    Based on: person-months of employment + diversity + progression
-    """
+    """Calculate contribution to refugee integration and social cohesion."""
     total_person_months = 0
     countries = set()
-    progressions = 0
     
     for p in placements:
         if p.get("start_date"):
@@ -503,11 +465,6 @@ def calculate_integration_contribution(placements, candidates_data):
             country = candidates_data[candidate_id].get("country_of_origin", "")
             if country and country not in ["United Kingdom", "UK", "England", "Scotland", "Wales", "Northern Ireland", "Unknown", ""]:
                 countries.add(country)
-    
-    # Integration score formula:
-    # Base: 10 points per person-month of employment
-    # Bonus: 50 points per country represented (diversity)
-    # This creates a meaningful metric for social contribution
     
     integration_score = (total_person_months * 10) + (len(countries) * 50)
     
@@ -587,6 +544,7 @@ def calculate_retention_savings(placements, sector, ach_retention_rate):
     }
 
 def calculate_diversity_contribution(placements, candidates_data):
+    """Calculate diversity contribution from placements."""
     country_counts = {}
     for p in placements:
         candidate_id = p.get("candidate_id")
@@ -603,6 +561,7 @@ def calculate_diversity_contribution(placements, candidates_data):
     }
 
 def get_partner_sector(partner_id):
+    """Get partner sector from database."""
     try:
         result = supabase.table("impact_partners").select("sector").eq("id", partner_id).execute()
         if result.data:
@@ -612,6 +571,7 @@ def get_partner_sector(partner_id):
     return "Other"
 
 def calculate_impact_metrics(partner_id):
+    """Calculate all impact metrics for a partner."""
     sector = get_partner_sector(partner_id)
     
     metrics = {
@@ -626,12 +586,12 @@ def calculate_impact_metrics(partner_id):
         "living_wage_percent": 0,
         "progression_count": 0,
         "training_count": 0,
-        "employer_quotes": [],  # From employer reviews
-        "candidate_quotes": [],  # From candidate reviews
+        "employer_quotes": [],
+        "candidate_quotes": [],
         "sector": sector,
         "placements_12m_plus": 0,
         "retained_12m_plus": 0,
-        "suitability_details": []  # Detailed suitability ratings
+        "suitability_details": []
     }
     
     placements = []
@@ -661,7 +621,6 @@ def calculate_impact_metrics(partner_id):
                         total_months += months
                 metrics["avg_tenure_months"] = round(total_months / len(active), 1)
             
-            # 12-month retention calculation
             placements_12m_plus = []
             for p in placements:
                 if p.get("start_date"):
@@ -686,13 +645,11 @@ def calculate_impact_metrics(partner_id):
             if metrics["total_placements"] > 0:
                 metrics["living_wage_percent"] = round((living_wage_count / metrics["total_placements"]) * 100)
             
-            # Calculate integration contribution
             metrics["integration_data"] = calculate_integration_contribution(placements, candidates_dict)
             metrics["diversity_data"] = calculate_diversity_contribution(placements, candidates_dict)
     except:
         pass
     
-    # Get employer reviews (for employer quotes shown on ACH dashboard)
     try:
         reviews = supabase.table("milestone_reviews_partner").select("*").eq("partner_id", partner_id).execute()
         if reviews.data:
@@ -700,7 +657,6 @@ def calculate_impact_metrics(partner_id):
             metrics["progression_count"] = sum(1 for r in reviews.data if r.get("progression"))
             metrics["training_count"] = sum(1 for r in reviews.data if r.get("received_training"))
             
-            # Collect detailed suitability ratings
             for r in reviews.data:
                 if r.get("suitability_ratings"):
                     ratings = json.loads(r["suitability_ratings"]) if isinstance(r["suitability_ratings"], str) else r["suitability_ratings"]
@@ -712,11 +668,9 @@ def calculate_impact_metrics(partner_id):
     except:
         pass
     
-    # Get candidate reviews (for candidate quotes shown on employer dashboard)
     try:
         candidate_reviews = supabase.table("milestone_reviews_candidate").select("*").execute()
         if candidate_reviews.data:
-            # Filter to placements for this partner
             placement_ids = [p["id"] for p in placements]
             partner_candidate_reviews = [r for r in candidate_reviews.data if r.get("placement_id") in placement_ids]
             metrics["candidate_quotes"] = [r.get("feedback_quote") for r in partner_candidate_reviews if r.get("feedback_quote")]
@@ -727,18 +681,7 @@ def calculate_impact_metrics(partner_id):
 
 
 def calculate_him_score(partner_id, metrics):
-    """
-    Calculate Holistic Impact Metrics (HIM) Score out of 1000.
-    
-    Business Impact (400 points):
-    - Sustained Employment (Retention): 200 points
-    - Economic Contribution (Diversity): 200 points
-    
-    Social Impact (600 points):
-    - 6 dimensions × 100 points each
-    - Combines employer assessment (50%) + employee voice (50%)
-    """
-    
+    """Calculate Holistic Impact Metrics (HIM) Score out of 1000."""
     him_score = {
         "total": 0,
         "business_impact": {
@@ -761,8 +704,6 @@ def calculate_him_score(partner_id, metrics):
             "employee_responses": 0
         }
     }
-    
-    # ============ BUSINESS IMPACT (400 points) ============
     
     retention_rate = metrics.get("retention_rate")
     
@@ -800,8 +741,6 @@ def calculate_him_score(partner_id, metrics):
         him_score["business_impact"]["diversity"]["score"]
     )
     
-    # ============ SOCIAL IMPACT (600 points) ============
-    
     dimension_names = {
         "economic_security": "Economic Security & Stability",
         "skill_growth": "Skill Use & Growth",
@@ -814,7 +753,6 @@ def calculate_him_score(partner_id, metrics):
     employer_scores = {}
     employee_scores = {}
     
-    # Get employer assessment
     try:
         assessment = supabase.table("inclusion_assessment_org").select("scores").eq("partner_id", partner_id).order("created_at", desc=True).limit(1).execute()
         
@@ -833,16 +771,13 @@ def calculate_him_score(partner_id, metrics):
     except:
         pass
     
-    # Get employee scores from candidate milestone reviews
     try:
-        # Get placements for this partner
         placements = supabase.table("placements").select("id").eq("partner_id", partner_id).execute()
         if placements.data:
             placement_ids = [p["id"] for p in placements.data]
             
             reviews = supabase.table("milestone_reviews_candidate").select("scores, placement_id").execute()
             if reviews.data:
-                # Filter to this partner's placements
                 partner_reviews = [r for r in reviews.data if r.get("placement_id") in placement_ids]
                 him_score["social_impact"]["employee_responses"] = len(partner_reviews)
                 
@@ -860,7 +795,6 @@ def calculate_him_score(partner_id, metrics):
     except:
         pass
     
-    # Calculate combined dimension scores
     for dim_key, dim_name in dimension_names.items():
         employer_val = employer_scores.get(dim_key, 0)
         employee_val = employee_scores.get(dim_key, 0)
@@ -886,6 +820,7 @@ def calculate_him_score(partner_id, metrics):
 
 
 def get_pending_reviews(partner_id):
+    """Get pending milestone reviews for a partner."""
     pending = []
     try:
         placements = supabase.table("placements").select("*").eq("partner_id", partner_id).eq("status", "Published").execute()
@@ -962,7 +897,7 @@ def ach_dashboard():
             countries.add(country)
     col4.metric("Countries Represented", len(countries))
     
-    # Success Stories from Employers
+    # Success Stories from Employers (shown on ACH dashboard)
     st.markdown('<p class="section-header">Success Stories from Employers</p>', unsafe_allow_html=True)
     
     employer_quotes = [r.get("contribution_quote") for r in reviews_data if r.get("contribution_quote")]
@@ -974,7 +909,6 @@ def ach_dashboard():
     else:
         st.info("Success stories will appear here as employers complete milestone reviews")
     
-    # Partners by Type
     st.markdown('<p class="section-header">Partners by Type</p>', unsafe_allow_html=True)
     
     partner_types_count = {}
@@ -989,7 +923,6 @@ def ach_dashboard():
     else:
         st.info("No partners registered yet")
     
-    # Sector Breakdown
     st.markdown('<p class="section-header">Placements by Sector</p>', unsafe_allow_html=True)
     
     sector_counts = {}
@@ -1008,7 +941,6 @@ def ach_dashboard():
             display_name = sector.split(" - ")[0] if " - " in sector else sector
             cols[i].metric(display_name[:20], count)
     
-    # Recent Activity
     st.markdown('<p class="section-header">Recent Placements</p>', unsafe_allow_html=True)
     
     if placements_data:
@@ -1019,7 +951,6 @@ def ach_dashboard():
     else:
         st.info("No placements yet")
     
-    # Candidates by Country
     st.markdown('<p class="section-header">Candidates by Country of Origin</p>', unsafe_allow_html=True)
     
     country_counts = {}
@@ -1040,7 +971,6 @@ def ach_dashboard():
     else:
         st.info("No candidate country data yet")
     
-    # Pending Actions
     st.markdown('<p class="section-header">Pending Actions</p>', unsafe_allow_html=True)
     
     all_pending = []
@@ -1445,19 +1375,17 @@ def ach_candidate_support():
     st.info("Candidate milestone check-in interface - coming soon")
 
 
-# ============ PARTNER DASHBOARD ============
+# ============ PARTNER DASHBOARD (ORIGINAL STYLE) ============
 def partner_dashboard():
     st.markdown('<p class="main-header">Your Impact Dashboard</p>', unsafe_allow_html=True)
     
     partner_id = st.session_state.get("user_id", 1)
     
     partner_tier = "Standard"
-    partner_name = "Partner"
     try:
-        partner_data = supabase.table("impact_partners").select("package_tier, name").eq("id", partner_id).execute()
+        partner_data = supabase.table("impact_partners").select("package_tier").eq("id", partner_id).execute()
         if partner_data.data:
             partner_tier = partner_data.data[0].get("package_tier", "Standard")
-            partner_name = partner_data.data[0].get("name", "Partner")
     except:
         pass
     
@@ -1465,134 +1393,155 @@ def partner_dashboard():
     him_score = calculate_him_score(partner_id, metrics)
     
     if partner_tier == "Impact Partner":
-        # ============ EXECUTIVE SUMMARY ============
-        st.markdown('<div class="executive-summary">', unsafe_allow_html=True)
-        st.markdown("### Executive Summary")
+        # HIM Score Card
+        st.markdown("""
+        <style>
+            .him-score-card { background: linear-gradient(135deg, #0f1c3f 0%, #1a2d5a 100%); border-radius: 20px; padding: 40px; text-align: center; margin-bottom: 30px; color: white; }
+            .him-score-value { font-size: 4rem; font-weight: 700; margin-bottom: 10px; }
+            .him-progress-bar { background: rgba(255,255,255,0.2); border-radius: 10px; height: 12px; margin-top: 20px; overflow: hidden; }
+            .him-progress-fill { background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%); height: 100%; border-radius: 10px; }
+            .impact-section { background: white; border-radius: 16px; padding: 25px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+            .impact-section-title { font-size: 1.1rem; font-weight: 600; color: #0f1c3f; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #e2e8f0; }
+            .impact-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+            .impact-row:last-child { border-bottom: none; }
+            .impact-metric-name { color: #475569; font-size: 0.95rem; }
+            .impact-metric-value { font-weight: 600; color: #0f1c3f; }
+            .impact-metric-bar { background: #e2e8f0; border-radius: 4px; height: 8px; width: 100px; margin-left: 15px; overflow: hidden; }
+            .impact-metric-fill { background: linear-gradient(90deg, #0f1c3f 0%, #1a2d5a 100%); height: 100%; border-radius: 4px; }
+            .quote-card { background: #f8fafc; border-left: 4px solid #0f1c3f; padding: 20px 25px; margin: 15px 0; font-style: italic; color: #475569; border-radius: 0 12px 12px 0; }
+            .action-item { background: #fffbeb; border-radius: 10px; padding: 15px 20px; margin: 10px 0; border-left: 4px solid #f59e0b; }
+        </style>
+        """, unsafe_allow_html=True)
         
-        total_placements = metrics.get("total_placements", 0)
-        integration_data = metrics.get("integration_data", {})
-        integration_score = integration_data.get("integration_score", 0)
-        integration_interpretation = integration_data.get("interpretation", "")
-        person_months = integration_data.get("total_person_months", 0)
-        countries = metrics.get("diversity_data", {}).get("countries_represented", 0)
-        retention_rate = metrics.get("retention_rate", 0) or 0
-        retention_savings = metrics.get("retention_savings", 0)
+        him_total = him_score["total"]
+        him_percentage = (him_total / 1000) * 100
         
-        # Summary paragraph
-        st.markdown(f"""
-Through your partnership with ACH, your organisation has created **{total_placements} jobs** for members of the 
-refugee and migrant community, representing **{round(person_months)} person-months** of sustained employment 
-across **{countries} countries** of origin. This represents a **{integration_interpretation.lower()}**.
-        """)
-        
-        st.markdown(f"**Your Holistic Impact Metric Score: {him_score['total']} / 1000**")
-        
-        # HIM Score Breakdown
-        st.markdown("#### Performance by Impact Area")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Business Value**")
-            
-            # Retention
-            retention_score = him_score['business_impact']['retention']['score']
-            retention_band = get_score_band(min(100, retention_score / 2))  # Scale 200 to 100
-            st.markdown(f"- **Retention Performance:** {retention_score}/200 ({retention_band['label']})")
-            st.caption(f"  {retention_rate}% retention rate, saving £{retention_savings:,.0f} in turnover costs")
-            
-            # Diversity
-            diversity_score = him_score['business_impact']['diversity']['score']
-            diversity_band = get_score_band(min(100, diversity_score / 2))
-            st.markdown(f"- **Diversity Contribution:** {diversity_score}/200 ({diversity_band['label']})")
-            st.caption(f"  {metrics.get('diversity_data', {}).get('total_employees', 0)} employees from {countries} countries")
-        
-        with col2:
-            st.markdown("**Social Impact**")
-            
-            social_dims = him_score['social_impact']['dimensions']
-            if social_dims:
-                for dim_name, dim_score in social_dims.items():
-                    band = get_score_band(dim_score)
-                    st.markdown(f"- **{dim_name}:** {dim_score}% ({band['label']})")
-            else:
-                st.caption("Complete the Holistic Impact Assessment to see social impact scores")
-        
-        # Interpretation note
-        st.markdown("---")
-        st.markdown("**How to interpret your score:**")
-        st.caption("""
-        • **Leading (81-100%):** Excellent practice, sector-leading performance
-        • **Established (61-80%):** Good practice with minor areas for improvement
-        • **Developing (41-60%):** Progress made but gaps remain
-        • **Foundational (0-40%):** Basic structures need development
-        """)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # ============ DETAILED METRICS ============
+        if him_total > 0:
+            st.markdown(f"""
+            <div class="him-score-card">
+                <div style="font-size: 1rem; opacity: 0.9; margin-bottom: 10px; letter-spacing: 2px; text-transform: uppercase;">Holistic Impact Score</div>
+                <div class="him-score-value">{him_total}<span style="font-size: 1.5rem; color: #94a3b8;"> / 1000</span></div>
+                <div class="him-progress-bar">
+                    <div class="him-progress-fill" style="width: {him_percentage}%;"></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="him-score-card">
+                <div style="font-size: 1rem; opacity: 0.9; margin-bottom: 10px; letter-spacing: 2px; text-transform: uppercase;">Holistic Impact Score</div>
+                <div style="font-size: 1rem; color: #94a3b8; padding: 20px 0;">Your Holistic Impact Score will appear as you record placements and complete the Holistic Impact Assessment</div>
+            </div>
+            """, unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
         
+        retention_rate = metrics.get("retention_rate")
+        has_12m_data = retention_rate is not None
+        if retention_rate is None:
+            retention_rate = 0
+        
+        diversity = metrics.get("diversity_data", {})
+        employees = diversity.get("total_employees", 0)
+        countries = diversity.get("countries_represented", 0)
+        
         with col1:
-            st.markdown('<p class="section-header">Business Value Generated</p>', unsafe_allow_html=True)
+            savings = metrics.get("retention_savings", 0)
+            savings_text = f"£{savings:,.0f}" if savings > 0 else "No data yet"
+            retention_text = f"{retention_rate}%" if has_12m_data else "No data yet"
+            diversity_text = f"{employees} employees, {countries} countries" if employees > 0 else "No data yet"
             
-            st.metric("12-Month Retention Rate", f"{retention_rate}%" if retention_rate else "No data yet")
-            st.metric("Estimated Retention Savings", f"£{retention_savings:,.0f}" if retention_savings > 0 else "No data yet")
-            st.metric("Living Wage Roles", f"{metrics.get('living_wage_percent', 0)}%")
-            st.metric("Average Tenure", f"{metrics.get('avg_tenure_months', 0)} months")
+            st.markdown('<div class="impact-section">', unsafe_allow_html=True)
+            st.markdown('<div class="impact-section-title">Business Impact Generated</div>', unsafe_allow_html=True)
             
-            # Methodology
-            savings_data = metrics.get("retention_savings_data", {})
-            if savings_data.get("methodology"):
-                st.caption(savings_data["methodology"])
+            st.markdown(f"""
+            <div class="impact-row">
+                <span class="impact-metric-name">12-Month Retention</span>
+                <span class="impact-metric-value">{retention_text}</span>
+            </div>
+            <div class="impact-row">
+                <span class="impact-metric-name">Estimated Retention Savings</span>
+                <span class="impact-metric-value">{savings_text}</span>
+            </div>
+            <div class="impact-row">
+                <span class="impact-metric-name">Diversity Contribution</span>
+                <span class="impact-metric-value">{diversity_text}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:
-            st.markdown('<p class="section-header">Social Impact Created</p>', unsafe_allow_html=True)
-            
-            social_dims = him_score['social_impact']['dimensions']
+            social_dimensions = him_score['social_impact']['dimensions']
             employer_completed = him_score['social_impact']['employer_completed']
             employee_responses = him_score['social_impact']['employee_responses']
             
+            st.markdown('<div class="impact-section">', unsafe_allow_html=True)
+            st.markdown('<div class="impact-section-title">Social Impact Created</div>', unsafe_allow_html=True)
+            
             if employer_completed or employee_responses > 0:
-                for dim_name, dim_score in social_dims.items():
-                    band = get_score_band(dim_score)
-                    col_a, col_b = st.columns([3, 1])
-                    col_a.write(dim_name)
-                    col_b.write(f"**{dim_score}%**")
-                    st.progress(dim_score / 100)
-                    st.caption(get_score_interpretation(dim_score, dim_name))
+                for dim_name, dim_score in social_dimensions.items():
+                    st.markdown(f"""
+                    <div class="impact-row">
+                        <span class="impact-metric-name">{dim_name}</span>
+                        <div style="display: flex; align-items: center;">
+                            <span class="impact-metric-value">{dim_score}%</span>
+                            <div class="impact-metric-bar"><div class="impact-metric-fill" style="width: {dim_score}%;"></div></div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 sources = []
                 if employer_completed:
                     sources.append("Employer assessment")
                 if employee_responses > 0:
                     sources.append(f"{employee_responses} employee response(s)")
-                st.caption(f"Based on: {' + '.join(sources)}")
+                st.markdown(f'<div style="padding-top: 10px; font-size: 0.8rem; color: #64748b;">Based on: {" + ".join(sources)}</div>', unsafe_allow_html=True)
             else:
-                st.info("Complete the Holistic Impact Assessment to see your Social Impact scores")
+                st.markdown('<div style="padding: 20px; text-align: center; color: #64748b;">Complete the Holistic Impact Assessment to see your Social Impact scores</div>', unsafe_allow_html=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
         
-        # ============ SUCCESS STORIES FROM CANDIDATES ============
+        # Retention Breakdown
+        st.markdown('<p class="section-header">Estimated Retention Savings Breakdown</p>', unsafe_allow_html=True)
+        
+        savings_data = metrics.get("retention_savings_data", {})
+        
+        if has_12m_data and savings_data:
+            st.caption(f"Based on {metrics.get('placements_12m_plus', 0)} placements that have reached 12 months")
+            
+            ach_rate = savings_data.get('ach_retention_percent', 0)
+            industry_rate = savings_data.get('industry_retention_percent', 0)
+            difference = savings_data.get('retention_uplift_percent', 0)
+            
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Your Retention", f"{ach_rate}%")
+            col2.metric("Industry Average", f"{industry_rate}%")
+            col3.metric("Your Uplift", f"+{difference}%")
+            col4.metric("Estimated Savings", f"£{savings_data.get('total_savings', 0):,.0f}")
+            
+            st.caption(savings_data.get('methodology', ''))
+        else:
+            st.info("Retention savings will be calculated once placements reach 12 months")
+        
+        # Success Stories from Candidates (shown on employer dashboard)
         st.markdown('<p class="section-header">What Your Employees Say</p>', unsafe_allow_html=True)
         
         candidate_quotes = metrics.get("candidate_quotes", [])
         if candidate_quotes:
             for quote in candidate_quotes[:3]:
-                st.markdown(f"""
-                <div class="quote-box">"{quote}"</div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div class="quote-card">"{quote}"</div>', unsafe_allow_html=True)
         else:
             st.info("Employee feedback will appear here as candidates complete their milestone reviews")
         
-        # ============ PENDING ACTIONS ============
+        # Pending Reviews
         pending = get_pending_reviews(partner_id)
         if pending:
             st.markdown('<p class="section-header">Action Required</p>', unsafe_allow_html=True)
             for p in pending:
-                st.warning(f"**{p['candidate_name']}** — {p['milestone']} due {p['due_date']}")
+                st.markdown(f'<div class="action-item"><strong>{p["candidate_name"]}</strong> — {p["milestone"]} due {p["due_date"]}</div>', unsafe_allow_html=True)
     
     else:
-        # ============ STANDARD TIER (LOCKED) ============
+        # Standard tier - locked dashboard
         st.markdown("""
         <style>
             .locked-metric { background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); border-radius: 12px; padding: 20px; text-align: center; margin: 10px 0; }
@@ -1619,13 +1568,11 @@ across **{countries} countries** of origin. This represents a **{integration_int
         <div class="upgrade-box">
             <h3>Unlock Your Full Impact Dashboard</h3>
             <p>Opt in to our <strong>Workforce Integration Package</strong> to unlock:</p>
-            <ul style="text-align: left; display: inline-block;">
-                <li>Full retention savings calculations</li>
-                <li>Diversity contribution insights</li>
-                <li>Social impact reporting</li>
-                <li>Retention guarantee</li>
-                <li>Corporate training</li>
-            </ul>
+            <p>• Full retention savings calculations<br>
+            • Diversity contribution insights<br>
+            • Social impact reporting<br>
+            • Retention guarantee<br>
+            • Corporate training</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -1689,7 +1636,6 @@ def partner_candidates():
     
     tab1, tab2, tab3 = st.tabs(["Recruitment", "Milestone Review", "Current Employees"])
     
-    # ============ RECRUITMENT TAB ============
     with tab1:
         st.markdown('<p class="sub-header">Record interview outcomes and new hires</p>', unsafe_allow_html=True)
         
@@ -1768,7 +1714,6 @@ def partner_candidates():
         except Exception as e:
             st.error(f"Error: {e}")
     
-    # ============ MILESTONE REVIEW TAB (UPDATED) ============
     with tab2:
         st.markdown('<p class="sub-header">Complete milestone reviews for your employees</p>', unsafe_allow_html=True)
         
@@ -1785,7 +1730,6 @@ def partner_candidates():
                         still_employed = st.radio("Still employed?", ["Yes", "No"], horizontal=True)
                         
                         if still_employed == "Yes":
-                            # ============ DETAILED SUITABILITY RATINGS ============
                             st.markdown("**Candidate Suitability Assessment**")
                             st.caption("Rate the candidate across key workplace competencies")
                             
@@ -1805,7 +1749,6 @@ def partner_candidates():
                             
                             st.divider()
                             
-                            # ============ TRAINING (WITH DETAILS) ============
                             received_training = st.radio("Received training?", ["Yes", "No"], horizontal=True, key=f"training_{review['placement_id']}")
                             
                             training_details = None
@@ -1816,7 +1759,6 @@ def partner_candidates():
                                     key=f"training_details_{review['placement_id']}"
                                 )
                             
-                            # ============ PROGRESSION (WITH DETAILS) ============
                             progression = st.radio("Any progression?", ["Yes", "No"], horizontal=True, key=f"progression_{review['placement_id']}")
                             
                             progression_details = None
@@ -1886,7 +1828,6 @@ def partner_candidates():
                             except Exception as e:
                                 st.error(f"Error: {e}")
     
-    # ============ CURRENT EMPLOYEES TAB ============
     with tab3:
         st.markdown('<p class="sub-header">View and edit current employee details</p>', unsafe_allow_html=True)
         
@@ -1914,7 +1855,6 @@ def partner_candidates():
                                 tenure_months = round(tenure_days / 30, 1)
                                 st.write(f"**Tenure:** {tenure_months} months")
                         
-                        # Show latest suitability ratings if available
                         try:
                             latest_review = supabase.table("milestone_reviews_partner").select("suitability_ratings, suitability_notes").eq("placement_id", placement["id"]).order("created_at", desc=True).limit(1).execute()
                             if latest_review.data and latest_review.data[0].get("suitability_ratings"):
@@ -1954,7 +1894,7 @@ def partner_candidates():
             st.error(f"Error: {e}")
 
 
-# ============ PARTNER REPORTS ============
+# ============ PARTNER REPORTS (WITH EXECUTIVE SUMMARY) ============
 def partner_reports():
     st.markdown('<p class="main-header">Impact Reports</p>', unsafe_allow_html=True)
     
@@ -1981,56 +1921,62 @@ def partner_reports():
     countries = metrics.get("diversity_data", {}).get("countries_represented", 0)
     retention_rate = metrics.get("retention_rate", 0) or 0
     retention_savings = metrics.get("retention_savings", 0)
+    integration_interpretation = integration_data.get("interpretation", "")
     
     st.markdown(f"""
 Through your partnership with ACH, your organisation has created **{total_placements} jobs** for members of the 
-refugee and migrant community, providing **{round(person_months)} person-months** of sustained employment 
-and representing **{countries} countries** of origin.
+refugee and migrant community, representing **{round(person_months)} person-months** of sustained employment 
+across **{countries} countries** of origin. This represents a **{integration_interpretation.lower()}**.
 
-**Business Value Generated:**
-- Retention Rate: {retention_rate}%
-- Estimated Retention Savings: £{retention_savings:,.0f}
-- Living Wage Roles: {metrics.get('living_wage_percent', 0)}%
+**Your Holistic Impact Metric Score: {him_score['total']} / 1000**
 
-**Social Impact Created:**
-- Holistic Impact Score: {him_score['total']} / 1000
-- Employees Trained: {metrics.get('training_count', 0)}
-- Career Progressions: {metrics.get('progression_count', 0)}
+You have scored as follows across the key impact areas:
     """)
+    
+    # Business Value breakdown
+    st.markdown("#### Business Value")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write(f"**Retention Performance:** {him_score['business_impact']['retention']['score']}/200")
+        st.caption(f"Your {retention_rate}% retention rate has saved an estimated £{retention_savings:,.0f} in turnover costs")
+    with col2:
+        st.write(f"**Diversity Contribution:** {him_score['business_impact']['diversity']['score']}/200")
+        st.caption(f"{metrics.get('diversity_data', {}).get('total_employees', 0)} employees from {countries} countries")
+    
+    # Social Impact breakdown
+    st.markdown("#### Social Impact")
+    social_dims = him_score['social_impact']['dimensions']
+    if social_dims:
+        for dim_name, dim_score in social_dims.items():
+            col1, col2 = st.columns([3, 1])
+            col1.write(f"**{dim_name}**")
+            col2.write(f"{dim_score}%")
+            st.progress(dim_score / 100)
+    else:
+        st.info("Complete the Holistic Impact Assessment to include social impact data in your reports")
     
     st.divider()
     
     # ============ DETAILED BREAKDOWN ============
+    st.markdown("### Detailed Breakdown")
+    
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("### Employment Outcomes")
+        st.markdown("#### Employment Outcomes")
         st.write(f"**Total Placements:** {metrics['total_placements']}")
         st.write(f"**Currently Employed:** {metrics['active_employees']}")
         st.write(f"**12-Month Retention Rate:** {retention_rate}%")
         st.write(f"**Average Tenure:** {metrics.get('avg_tenure_months', 0)} months")
     
     with col2:
-        st.markdown("### Financial Impact")
-        st.write(f"**Retention Savings:** £{retention_savings:,.0f}")
+        st.markdown("#### Financial Impact")
+        st.write(f"**Estimated Retention Savings:** £{retention_savings:,.0f}")
         st.write(f"**Living Wage Roles:** {metrics['living_wage_percent']}%")
         st.write(f"**Employees Trained:** {metrics['training_count']}")
         st.write(f"**Career Progressions:** {metrics['progression_count']}")
     
-    # ============ SOCIAL IMPACT DIMENSIONS ============
-    st.divider()
-    st.markdown("### Social Impact Dimensions")
-    
-    social_dims = him_score['social_impact']['dimensions']
-    if social_dims:
-        for dim_name, dim_score in social_dims.items():
-            band = get_score_band(dim_score)
-            st.write(f"**{dim_name}:** {dim_score}% ({band['label']})")
-            st.caption(get_score_interpretation(dim_score, dim_name))
-    else:
-        st.info("Complete the Holistic Impact Assessment to include social impact data in your reports")
-    
-    # ============ SUCCESS STORIES ============
+    # Employee Testimonials
     if metrics.get("candidate_quotes"):
         st.divider()
         st.markdown("### Employee Testimonials")
