@@ -141,7 +141,7 @@ INDUSTRY_BENCHMARKS = {
 }
 
 def get_sector_benchmark(sector):
-"""Map detailed sector to benchmark category"""
+""Map detailed sector to benchmark category""
 sector_lower = sector.lower() if sector else ""
 if "healthcare" in sector_lower or "hospital" in sector_lower or "nhs" in sector_lower or "dental" in sector_lower or "pharmacy" in sector_lower:
 return INDUSTRY_BENCHMARKS["Healthcare"]
